@@ -5,6 +5,7 @@
 import os
 import re
 import glob
+import json
 import matplotlib
 import matplotlib as mpl
 matplotlib.use('Agg')
@@ -12,7 +13,8 @@ from pylab import *
 import numpy as np
 
 class BenchmarkData:
-  def __init__(self, input_folder):
+  def __init__(self, config):
+    input_folder = config.input_folder
     self.dir_name = os.path.basename(input_folder)
     m = re.match('fixedwork-out-(?P<num_threads>.*)-(?P<num_loops>.*)-(?P<fake_work>.*)', self.dir_name)
     self.num_threads = int(m.group('num_threads'))
@@ -44,7 +46,7 @@ class ThreadStats:
     self.end_time = int(line[3])
     self.join_time = int(line[4])
 
-def graph_compute_times(bdata, folder):
+def graph_compute_times(bdata, config):
   title("Total Compute Time Per Thread")
   xlabel("Thread Number (Ordered by Compute Time)")
   ylabel("Total Compute Time (ms)")
@@ -57,12 +59,12 @@ def graph_compute_times(bdata, folder):
     avg_ticks = map(lambda x: np.mean(x), np.transpose(ticks))
     avg_time = map(lambda x: x/tsc_freq*1000, avg_ticks)
     plot(range(len(avg_time)), avg_time, label=lib)
-  legend()
-  figname = folder + "/compute_times.png"
+  legend(framealpha=0.5, loc='best')
+  figname = config.output_folder + "/compute_times.png"
   savefig(figname)
   clf()
 
-def graph_start_times(bdata, folder):
+def graph_start_times(bdata, config):
   title("Start Time Per Thread")
   xlabel("Thread Number (Ordered by Start Time)")
   ylabel("Start Time (s)")
@@ -76,12 +78,12 @@ def graph_start_times(bdata, folder):
     avg_ticks = map(lambda x: np.mean(x), np.transpose(ticks))
     avg_time = map(lambda x: x/tsc_freq, avg_ticks)
     plot(range(len(avg_time)), avg_time, label=lib)
-  legend()
-  figname = folder + "/start_times.png"
+  legend(framealpha=0.5, loc='best')
+  figname = config.output_folder + "/start_times.png"
   savefig(figname)
   clf()
 
-def graph_completion_times(bdata, folder):
+def graph_completion_times(bdata, config):
   title("Completion Time Per Thread")
   xlabel("Thread Number (Ordered by CompletionTime)")
   ylabel("Completion Time (s)")
@@ -95,18 +97,32 @@ def graph_completion_times(bdata, folder):
     avg_ticks = map(lambda x: np.mean(x), np.transpose(ticks))
     avg_time = map(lambda x: x/tsc_freq, avg_ticks)
     plot(range(len(avg_time)), avg_time, label=lib)
-  legend(loc='center right')
-  figname = folder + "/completion_times.png"
+  legend(framealpha=0.5, prop={'size':10}, loc='best')
+  figname = config.output_folder + "/completion_times.png"
   savefig(figname)
   clf()
 
-def generate_graphs(args):
+def generate_graphs(parser, args):
+  config = lambda:None
+  if args.config_file:
+    config.__dict__ = json.load(file(args.config_file))
+    if args.input_folder:
+      config.input_folder = args.input_folder
+    if args.output_folder:
+      config.output_folder = args.output_folder
+  elif args.input_folder and args.output_folder:
+    config.input_folder = args.input_folder
+    config.output_folder = args.output_folder
+  else:
+    parser.print_help()
+    exit(1)
+
   try:
-    os.mkdir(args.output_folder)
+    os.mkdir(config.output_folder)
   except:
     pass
-  bdata = BenchmarkData(args.input_folder)
-  graph_compute_times(bdata, args.output_folder)
-  graph_start_times(bdata, args.output_folder)
-  graph_completion_times(bdata, args.output_folder)
+  bdata = BenchmarkData(config)
+  graph_compute_times(bdata, config)
+  graph_start_times(bdata, config)
+  graph_completion_times(bdata, config)
 

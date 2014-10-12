@@ -1,0 +1,22 @@
+{
+	"input_folder"  : "../data/fixedwork-out-24-300000-10000",
+	"output_folder" : "../data/fixedwork-graphs-24-300000-10000",
+
+	"graph_config" : {
+        "compute_times" : {
+	        "legend_pos" : "" ,
+	        "legend_font_size" : "" ,
+	        "legend_bbox_to_anchor" : "" 
+        },
+        "start_times" : {
+	        "legend_pos" : "" ,
+	        "legend_font_size" : "" ,
+	        "legend_bbox_to_anchor" : "" 
+        },
+        "completion_times" : {
+	        "legend_pos" : "" ,
+	        "legend_font_size" : "" ,
+	        "legend_bbox_to_anchor" : "" 
+        }
+    }
+}
