@@ -28,8 +28,8 @@ run-iteration() {
 }
 
 sleep 10 # Give me time to log out while it runs
-for exec in ${EXECS}; do
-  for i in `seq ${ITERATIONS}`; do
+for i in `seq ${ITERATIONS}`; do
+  for exec in ${EXECS}; do
     if [ "${exec}" = 'upthread-juggle' ]; then
       for p in ${PREEMPT_PERIODS}; do
         run-iteration ${exec} ${i} ${p}
