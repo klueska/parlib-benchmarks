@@ -1,0 +1,8 @@
+*.swp
+*.swo
+*.pyc
+data/
+support/frequency-test
+fixedwork/*-fixedwork
+!fixedwork/run-fixedwork
+fixedwork/python/*-graphs-*/
