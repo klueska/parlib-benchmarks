@@ -20,7 +20,7 @@ run-iteration() {
   local i=${2}
   local period=${3}
   if [ "${period}" != "0" ]; then
-    PERIOD_MOD="$(expr ${period} / 1000)ms-"
+    local PERIOD_MOD="$(expr ${period} / 1000)ms-"
   fi
   ./${exec}-${BENCHMARK} ${NUM_THREADS} ${NUM_LOOPS} \
                          ${FAKE_WORK} ${HUMAN_DUMP} ${period} \
