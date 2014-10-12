@@ -58,13 +58,6 @@
 	#define calibrate_all_tscs() 
 #endif
 
-/* A two step barrier before the actual test begins. After thread creation, no
- * threads can start until all threads have spun up and set checked in at the
- * test barrier. After checking in, the main thread releases them and they
- * start running. */
-int test_barrier = 0;
-int main_barrier = 0;
-
 /* Modifiable via command line */
 int nr_threads = 1;
 int nr_loops = 1;
@@ -120,19 +113,6 @@ static void *__thread_wrapper(void *arg)
 {
 	int id = (int)(long)arg;
 
-	/* Wait until every thread has spun up, and is ready to go. */
-	__sync_fetch_and_add(&test_barrier, 1);
-	while (test_barrier != nr_threads) {
-		cpu_relax();
-		#ifdef USE_UPTHREAD
-		pthread_yield();
-		#endif
-	}
-
-	/* Wait until the main thread has released us. */
-	while (!main_barrier)
-		cpu_relax();
-
 	/* Let the games begin! */
 	tstats[id].start_time = read_tsc();
 	for (int i = 0; i < nr_loops; i++) {
@@ -160,12 +140,7 @@ int main(int argc, char **argv)
 		pthread_create(&thandles[i], NULL, __thread_wrapper, (void*)(long)i);
 	}
 
-	/* Wait until every thread has spun up, and is ready to go. */
-	while (test_barrier != nr_threads)
-		cpu_relax();
-
 	/* Let the games begin! */
-	main_barrier = 1;
 	uint64_t prog_start = read_tsc();
 	for (int i=0; i<nr_threads; i++) {
 		pthread_join(thandles[i], NULL);
