@@ -117,7 +117,7 @@ static void *__thread_wrapper(void *arg)
 	tstats[id].start_time = read_tsc();
 	for (int i = 0; i < nr_loops; i++) {
 		for (int j=0; j<fake_work; j++)
-			cpu_relax();
+			cmb();
 		#ifdef WITH_YIELD
 		pthread_yield();
 		#endif
