@@ -134,14 +134,12 @@ int main(int argc, char **argv)
 	/* Do any library specific test prep */
 	test_prep();
 
-	/* Launch all my threads */
+	/* Let the games begin! */
+	uint64_t prog_start = read_tsc();
 	for (int i=0; i<nr_threads; i++) {
 		tstats[i].create_time = read_tsc();
 		pthread_create(&thandles[i], NULL, __thread_wrapper, (void*)(long)i);
 	}
-
-	/* Let the games begin! */
-	uint64_t prog_start = read_tsc();
 	for (int i=0; i<nr_threads; i++) {
 		pthread_join(thandles[i], NULL);
 		tstats[i].join_time = read_tsc();
