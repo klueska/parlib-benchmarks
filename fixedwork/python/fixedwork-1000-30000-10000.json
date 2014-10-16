@@ -1,0 +1,46 @@
+{
+	"input_folder"  : "../data/fixedwork-out-1000-30000-10000",
+	"output_folder" : "../data/fixedwork-graphs-1000-30000-10000",
+
+	"libs" : {
+		"upthread-yield": {
+			"color" : "#948B3D"
+		},
+		"upthread-juggle-10ms": {
+			"color" : "#DA7C30"
+		},
+		"upthread-juggle-100ms": {
+			"color" : "#922428"
+		},
+		"native-pthread": {
+			"color" : "#3E9651"
+		},
+		"upthread-juggle-500ms": {
+			"color" : "#535154"
+		},
+		"upthread-juggle-1000ms": {
+			"color" : "#396AB1"
+		},
+		"upthread": {
+			"color" : "#CC2529"
+		}
+	},
+
+	"graphs" : {
+        "compute_times" : {
+	        "legend_loc" : "" ,
+	        "legend_font_size" : "" ,
+	        "legend_bbox_to_anchor" : "" 
+        },
+        "start_times" : {
+	        "legend_loc" : "" ,
+	        "legend_font_size" : "" ,
+	        "legend_bbox_to_anchor" : "" 
+        },
+        "completion_times" : {
+	        "legend_loc" : "best" ,
+	        "legend_font_size" : "" ,
+	        "legend_bbox_to_anchor" : null
+        }
+    }
+}
