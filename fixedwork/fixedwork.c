@@ -24,39 +24,7 @@
 #include <parlib/vcore.h>
 #include <parlib/timing.h>
 #include <parlib/arch.h>
-
-#ifndef PREEMPT_PERIOD
-#define PREEMPT_PERIOD 10000
-#endif
-
-#ifdef USE_PTHREAD
-	#include <pthread.h>
-	#define pthread_yield()
-	#define test_prep() \
-		calibrate_all_tscs();
-	void calibrate_all_tscs();
-#elif USE_UPTHREAD | USE_UPTHREAD_JUGGLE
-	#if USE_UPTHREAD
-		#include <upthread/upthread.h>
-		#define pthread_yield upthread_yield
-		#define test_prep()
-	#elif USE_UPTHREAD_JUGGLE
-		#include <upthread-juggle/upthread.h>
-		#define pthread_yield()
-		#define test_prep() \
-			upthread_set_sched_period(preempt_period);
-		#define printf(...) \
-		{ \
-			upthread_disable_interrupts(); \
-			printf(__VA_ARGS__); \
-			upthread_enable_interrupts(); \
-		}
-	#endif
-	#define pthread_t upthread_t
-	#define pthread_create upthread_create
-	#define pthread_join upthread_join
-	#define calibrate_all_tscs() 
-#endif
+#include "../libconfig.h"
 
 /* Modifiable via command line */
 int nr_threads = 1;
