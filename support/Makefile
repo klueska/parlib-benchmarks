@@ -1,9 +1,9 @@
-EXECS = frequency-test
+EXECS = frequency-test fsbase-test
 
 all: $(EXECS)
 
-frequency-test: %: %.c
-	$(CC) -o $(@) $(^)
+$(EXECS): %: %.c
+	$(CC) -o $(@) -std=gnu99 $(^) -lparlib
 
 clean:
 	rm -rf $(EXECS)

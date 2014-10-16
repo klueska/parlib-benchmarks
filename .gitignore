@@ -2,7 +2,9 @@
 *.swo
 *.pyc
 data/
-support/frequency-test
+support/*-test
 fixedwork/*-fixedwork
 !fixedwork/run-fixedwork
-fixedwork/python/*-graphs-*/
+ctxswitch/*-ctxswitch
+!ctxswitch/run-ctxswitch
+*/python/*-graphs-*/
