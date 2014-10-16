@@ -5,13 +5,14 @@
 : ${FAKE_WORK:=1000}
 : ${HUMAN_DUMP:=0}
 
-: ${ITERATIONS:=10}
+: ${SEQ_START:=1}
+: ${SEQ_END:=10}
 : ${SLEEP:=5}
 
-BENCHMARK="fixedwork"
-EXECS="native-pthread upthread upthread-yield upthread-juggle"
-PREEMPT_PERIODS="10000 100000 1000000"
+: ${EXECS:="native-pthread upthread upthread-yield upthread-juggle"}
+: ${PREEMPT_PERIODS:="10000 100000 500000 1000000"}
 
+BENCHMARK="fixedwork"
 DIRNAME=data/${BENCHMARK}-out-${NUM_THREADS}-${NUM_LOOPS}-${FAKE_WORK}
 mkdir -p ${DIRNAME}
 
@@ -27,8 +28,8 @@ run-iteration() {
                          > ${DIRNAME}/${exec}-${PERIOD_MOD}${BENCHMARK}-out-${i}.dat;
 }
 
-sleep 10 # Give me time to log out while it runs
-for i in `seq ${ITERATIONS}`; do
+sleep 30 # Give me time to log out while it runs
+for i in `seq ${SEQ_START} ${SEQ_END}`; do
   for exec in ${EXECS}; do
     if [ "${exec}" = 'upthread-juggle' ]; then
       for p in ${PREEMPT_PERIODS}; do
