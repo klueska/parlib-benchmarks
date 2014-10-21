@@ -11,6 +11,7 @@ import matplotlib as mpl
 matplotlib.use('Agg')
 from pylab import *
 import numpy as np
+from collections import OrderedDict
 
 class BenchmarkData:
   def __init__(self, config):
@@ -84,10 +85,19 @@ def graph_start_times(bdata, config):
   clf()
 
 def graph_completion_times(bdata, config):
-  title("Completion Time Per Thread")
-  xlabel("Thread Number (Ordered by CompletionTime)")
+  t = "Average Completion Time Per Thread (%d runs)\n" \
+    + "%d Threads Running %d Million Iterations Each" 
+  title(t % (len(bdata.data.itervalues().next()),
+             bdata.num_threads,
+             bdata.num_loops * bdata.fake_work / 1000000))
+       
+  xlabel("Thread Number")
   ylabel("Completion Time (s)")
-  for lib in bdata.data.keys():
+  for lib in config.libs.keys():
+    if 'alias' in config.libs[lib].keys():
+      libname = config.libs[lib]['alias']
+    else:
+      libname = lib
     ticks = []
     for i in bdata.data[lib].keys():
       prog_start = bdata.data[lib][i].prog_start
@@ -96,8 +106,13 @@ def graph_completion_times(bdata, config):
       ticks.append(sorted(t))
     avg_ticks = map(lambda x: np.mean(x), np.transpose(ticks))
     avg_time = map(lambda x: x/tsc_freq, avg_ticks)
-    plot(range(len(avg_time)), avg_time, label=lib)
-  legend(framealpha=0.5, prop={'size':10}, loc='best')
+    plot(range(len(avg_time)), avg_time, label=libname, linewidth=2,
+         color=config.libs[lib]['color'])
+    leg = legend(framealpha=0.5, prop={'size': 10}, 
+                 loc=config.graphs['completion_times']['legend_loc'],
+                 bbox_to_anchor=config.graphs['completion_times']['legend_bbox_to_anchor'])
+  for legobj in leg.legendHandles:
+    legobj.set_linewidth(6.0)
   figname = config.output_folder + "/completion_times.png"
   savefig(figname)
   clf()
@@ -105,7 +120,7 @@ def graph_completion_times(bdata, config):
 def generate_graphs(parser, args):
   config = lambda:None
   if args.config_file:
-    config.__dict__ = json.load(file(args.config_file))
+    config.__dict__ = json.load(file(args.config_file), object_pairs_hook=OrderedDict)
     if args.input_folder:
       config.input_folder = args.input_folder
     if args.output_folder:

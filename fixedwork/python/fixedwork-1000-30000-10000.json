@@ -4,24 +4,30 @@
 
 	"libs" : {
 		"upthread-yield": {
+			"alias" : "upthread-coop-yield-10000",
 			"color" : "#948B3D"
 		},
 		"upthread-juggle-10ms": {
+			"alias" : "upthread-10ms",
 			"color" : "#DA7C30"
 		},
 		"upthread-juggle-100ms": {
+			"alias" : "upthread-100ms",
 			"color" : "#922428"
 		},
 		"native-pthread": {
 			"color" : "#3E9651"
 		},
 		"upthread-juggle-500ms": {
+			"alias" : "upthread-500ms",
 			"color" : "#535154"
 		},
 		"upthread-juggle-1000ms": {
+			"alias" : "upthread-1000ms",
 			"color" : "#396AB1"
 		},
 		"upthread": {
+			"alias" : "upthread-no-preempt",
 			"color" : "#CC2529"
 		}
 	},
