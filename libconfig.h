@@ -38,9 +38,12 @@
     #define pthread_id() pthread_self()
 	#define vcore_id() (-1)
 	#define udelay usleep
-#elif USE_UPTHREAD | USE_UPTHREAD_JUGGLE
+#elif USE_UPTHREAD | USE_UPTHREAD_JUGGLE | USE_UPTHREAD_PVCQ
 	#if USE_UPTHREAD
 		#include <upthread/upthread.h>
+		#define test_prep()
+	#elif USE_UPTHREAD_PVCQ
+		#include <upthread-pvcq/upthread.h>
 		#define test_prep()
 	#elif USE_UPTHREAD_JUGGLE
 		#include <upthread-juggle/upthread.h>
@@ -53,10 +56,10 @@
 			upthread_enable_interrupts(); \
 		}
 	#endif
-	#define pthread_yield() upthread_yield
+	#define pthread_yield upthread_yield
 	#define pthread_t upthread_t
 	#define pthread_create upthread_create
 	#define pthread_join upthread_join
-	#define calibrate_all_tscs() 
-    #define pthread_id() (upthread_self()->id)
+	#define calibrate_all_tscs()
+	#define pthread_id() (upthread_self()->id)
 #endif
