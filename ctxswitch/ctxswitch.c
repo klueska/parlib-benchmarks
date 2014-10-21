@@ -27,9 +27,9 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 #define MAX_NR_TEST_THREADS 100000
 int nr_yield_threads = 100;
-int nr_yield_loops = 100;
+long nr_yield_loops = 100;
 int nr_vcores = 0;
-int amt_fake_work = 0;
+int human_dump = 1;
 
 pthread_t my_threads[MAX_NR_TEST_THREADS];
 void *my_retvals[MAX_NR_TEST_THREADS];
@@ -41,16 +41,8 @@ void *yield_thread(void* arg)
 	/* Wait til all threads are created */
 	while (!ready)
 		cpu_relax();
-	for (int i = 0; i < nr_yield_loops; i++) {
-		printf_safe("[A] pthread %d on vcore %d, itr: %d\n",
-		            pthread_id(), vcore_id(), i);
-		/* Fakes some work by spinning a bit.  Amount varies per uth/vcore,
-		 * scaled by fake_work */
-		if (amt_fake_work)
-			udelay(amt_fake_work * (pthread_id() * (vcore_id() + 2)));
+	for (uint64_t i = 0; i < nr_yield_loops; i++) {
 		pthread_yield();
-		printf_safe("[A] pthread %d returned from yield on vcore %d, itr: %d\n",
-		            (int)pthread_id(), vcore_id(), i);
 	}
 	return (void*)(long)(pthread_id());
 }
@@ -69,23 +61,23 @@ int main(int argc, char** argv)
 	if (argc > 3)
 		nr_vcores = strtol(argv[3], 0, 10);
 	if (argc > 4)
-		amt_fake_work = strtol(argv[4], 0, 10);
+		human_dump = strtol(argv[4], 0, 10);
 	nr_yield_threads = MIN(nr_yield_threads, MAX_NR_TEST_THREADS);
-	printf("Making %d threads of %d loops each, on %d vcore(s), %d work\n",
-	       nr_yield_threads, nr_yield_loops, nr_vcores, amt_fake_work);
+	if (human_dump)
+		printf("Making %d threads of %ld loops each, on %d vcore(s)\n",
+		       nr_yield_threads, nr_yield_loops, nr_vcores);
 
 	/* OS dependent prep work */
 #ifndef USE_PTHREAD
 	if (nr_vcores) {
 		/* Only do the vcore trickery if requested */
 		upthread_can_vcore_request(FALSE);	/* 2LS won't manage vcores */
-		int ret = vcore_request(nr_vcores - 1);		/* ghetto incremental interface */
-		printf("ret: %d\n", ret);
+		vcore_request(nr_vcores - 1);		/* ghetto incremental interface */
 		for (int i = 0; i < nr_vcores; i++) {
 			printf_safe("Vcore %d mapped to pcore %d\n", i, i);
 		}
 	}
-#endif /* __ros__ */
+#endif
 
 	/* create and join on yield */
 	for (int i = 0; i < nr_yield_threads; i++) {
@@ -107,13 +99,20 @@ int main(int argc, char** argv)
 	nr_ctx_switches = nr_yield_threads * nr_yield_loops;
 	usec_diff = (end_tv.tv_sec - start_tv.tv_sec) * 1000000 +
 	            (end_tv.tv_usec - start_tv.tv_usec);
-	printf("Done: %d uthreads, %d loops, %d vcores, %d work\n",
-	       nr_yield_threads, nr_yield_loops, nr_vcores, amt_fake_work);
-	printf("Nr context switches: %ld\n", nr_ctx_switches);
-	printf("Time to run: %ld usec\n", usec_diff);
-	if (nr_vcores == 1)
-		printf("Context switch latency: %lld nsec\n",
-		       (1000LL*usec_diff / nr_ctx_switches));
-	printf("Context switches / sec: %lld\n\n",
-	       (1000000LL*nr_ctx_switches / usec_diff));
-} 
+
+	if (human_dump) {
+		printf("Done: %d uthreads, %ld loops, %d vcores\n",
+		       nr_yield_threads, nr_yield_loops, nr_vcores);
+		printf("Nr context switches: %ld\n", nr_ctx_switches);
+		printf("Time to run: %ld usec\n", usec_diff);
+		if (nr_vcores == 1)
+			printf("Context switch latency: %lld nsec\n",
+			       (1000LL*usec_diff / nr_ctx_switches));
+		printf("Context switches / sec: %lld\n\n",
+		       (1000000LL*nr_ctx_switches / usec_diff));
+	} else {
+		uint64_t start = start_tv.tv_sec * 1000000 + start_tv.tv_usec;
+		uint64_t end = end_tv.tv_sec * 1000000 + end_tv.tv_usec;
+		printf("%d:%lu:%lu\n", nr_vcores, start, end);
+	}
+}
