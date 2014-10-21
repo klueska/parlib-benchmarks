@@ -1,0 +1,31 @@
+#! /usr/bin/env bash
+
+: ${NUM_THREADS:=1000}
+: ${NUM_LOOPS:=1000}
+: ${HUMAN_DUMP:=0}
+: ${NUM_VCORES:=24}
+
+: ${SEQ_START:=1}
+: ${SEQ_END:=10}
+: ${SLEEP:=5}
+
+: ${EXECS:="native-pthread upthread-pvcq"}
+
+BENCHMARK="ctxswitch"
+DIRNAME=data/${BENCHMARK}-out-${NUM_THREADS}-${NUM_LOOPS}
+mkdir -p ${DIRNAME}
+
+sleep 30 # Give me time to log out while it runs
+for i in `seq ${SEQ_START} ${SEQ_END}`; do
+  for exec in ${EXECS}; do
+    for v in `seq ${NUM_VCORES}`; do
+      taskset -c 0-$(expr ${v} - 1) \
+          ./${exec}-${BENCHMARK} ${NUM_THREADS} ${NUM_LOOPS} \
+                                 ${v} ${HUMAN_DUMP} \
+                                 >> ${DIRNAME}/${exec}-${BENCHMARK}-out-${i}.dat;
+      #echo Finished ${exec} vcores ${v} iteration ${i}
+      sleep ${SLEEP};
+    done
+  done
+done
+
