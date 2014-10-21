@@ -1,10 +1,12 @@
 
 CFILES = $(patsubst %, %.c, $(BENCHMARKS))
-PTHREAD_EXECS = $(foreach b, $(BENCHMARKS), native-pthread-$b)
-UPTHREAD_EXECS = $(foreach b, $(BENCHMARKS), upthread-$b)
-UPTHREAD_JUGGLE_EXECS = $(foreach b, $(BENCHMARKS), upthread-juggle-$b)
+EXECS += $(foreach l, $(LIBS), $(foreach b, $(BENCHMARKS), $(l)-$(b)))
 
-EXECS += $(PTHREAD_EXECS) $(UPTHREAD_EXECS) $(UPTHREAD_JUGGLE_EXECS)
+PTHREAD_EXECS += $(foreach b, $(BENCHMARKS), native-pthread-$(b))
+UPTHREAD_EXECS += $(foreach b, $(BENCHMARKS), upthread-$(b))
+UPTHREAD_JUGGLE_EXECS += $(foreach b, $(BENCHMARKS), upthread-juggle-$(b))
+UPTHREAD_YIELD_EXECS = $(foreach b, $(BENCHMARKS), upthread-yield-$b)
+UPTHREAD_PVCQ_EXECS += $(foreach b, $(BENCHMARKS), upthread-pvcq-$(b))
 
 NATIVE_EXTRAS += ../native-timing.c
 
@@ -16,6 +18,9 @@ $(subst -, , $(1))
 endef
 define extract_benchmark
 $(word $(words $(call split_target, $(1))), $(call split_target, $(1)))
+endef
+define extract_lib
+$(subst $space),-, $(filter-out $(call extract_benchmark, $(1)), $(1)))
 endef
 define EXEC-RULE
 $(1): $(2)
@@ -39,6 +44,11 @@ $(call EXEC-RULE, $(1), $(call extract_benchmark, $(1)).c, \
                   $(CFLAGS) -DUSE_UPTHREAD_JUGGLE , \
 									$(LDFLAGS) -lupthread-juggle -lparlib)
 endef
+define UPTHREAD-PVCQ-EXEC-RULE
+$(call EXEC-RULE, $(1), $(call extract_benchmark, $(1)).c, \
+                  $(CFLAGS) -DUSE_UPTHREAD_PVCQ , \
+									$(LDFLAGS) -lupthread-pvcq -lparlib)
+endef
 
 # All the targets
 all: $(EXECS) 
@@ -47,6 +57,8 @@ all: $(EXECS)
 $(foreach exec, $(PTHREAD_EXECS), $(eval $(call PTHREAD-EXEC-RULE, $(exec))))
 $(foreach exec, $(UPTHREAD_EXECS), $(eval $(call UPTHREAD-EXEC-RULE, $(exec))))
 $(foreach exec, $(UPTHREAD_JUGGLE_EXECS), $(eval $(call UPTHREAD-JUGGLE-EXEC-RULE, $(exec))))
+$(foreach exec, $(UPTHREAD_YIELD_EXECS), $(eval $(call UPTHREAD-YIELD-EXEC-RULE, $(exec))))
+$(foreach exec, $(UPTHREAD_PVCQ_EXECS), $(eval $(call UPTHREAD-PVCQ-EXEC-RULE, $(exec))))
 
 clean:
 	rm -rf $(EXECS)
