@@ -34,13 +34,19 @@ int human_dump = 1;
 pthread_t my_threads[MAX_NR_TEST_THREADS];
 void *my_retvals[MAX_NR_TEST_THREADS];
 
+volatile int barrier = 0;
 bool ready = FALSE;
 
 void *yield_thread(void* arg)
 {	
-	/* Wait til all threads are created */
+	/* Wait til all threads are up and running */
+	atomic_add(&barrier, 1);
+	while (barrier != nr_yield_threads)
+		pthread_yield();
+	/* Wait til the main thread releases us */
 	while (!ready)
-		cpu_relax();
+		pthread_yield();
+	/* Do the loop... */
 	for (uint64_t i = 0; i < nr_yield_loops; i++) {
 		pthread_yield();
 	}
@@ -49,11 +55,12 @@ void *yield_thread(void* arg)
 
 int main(int argc, char** argv) 
 {
-	struct timeval start_tv = {0};
-	struct timeval end_tv = {0};
-	long usec_diff;
-	long nr_ctx_switches;
+	uint64_t start = 0;
+	uint64_t end = 0;
+	uint64_t usec_diff;
+	uint64_t nr_ctx_switches;
 
+	/* Parse the args */
 	if (argc > 1)
 		nr_yield_threads = strtol(argv[1], 0, 10);
 	if (argc > 2)
@@ -70,36 +77,43 @@ int main(int argc, char** argv)
 	/* OS dependent prep work */
 #ifndef USE_PTHREAD
 	if (nr_vcores) {
-		/* Only do the vcore trickery if requested */
-		upthread_can_vcore_request(FALSE);	/* 2LS won't manage vcores */
-		vcore_request(nr_vcores - 1);		/* ghetto incremental interface */
-		for (int i = 0; i < nr_vcores; i++) {
-			printf_safe("Vcore %d mapped to pcore %d\n", i, i);
-		}
+		upthread_can_vcore_request(FALSE);
+		upthread_can_steal(TRUE);
+		upthread_short_circuit_yield(TRUE);
+		upthread_set_num_vcores(nr_vcores);
 	}
 #endif
-
-	/* create and join on yield */
+	/* Create the threads */
 	for (int i = 0; i < nr_yield_threads; i++) {
 		printf_safe("[A] About to create thread %d\n", i);
 		if (pthread_create(&my_threads[i], NULL, &yield_thread, NULL))
 			perror("pth_create failed");
 	}
-	if (gettimeofday(&start_tv, 0))
-		perror("Start time error...");
-	ready = TRUE;			/* signal to any spinning uthreads to start */
+	/* More OS dependent prep work */
+#ifndef USE_PTHREAD
+	vcore_request(nr_vcores - 1);
+#endif
+
+	/* Wait til all threads are up and running */
+	while (barrier != nr_yield_threads)
+		pthread_yield();
+	/* Start the clock */
+	start = read_tsc();
+	/* Release the threads */
+	ready = TRUE;
+	/* Join on all the threads */
 	for (int i = 0; i < nr_yield_threads; i++) {
 		printf_safe("[A] About to join on thread %d(%p)\n", i, my_threads[i]);
 		pthread_join(my_threads[i], &my_retvals[i]);
 		printf_safe("[A] Successfully joined on thread %d (retval: %p)\n", i,
 		            my_retvals[i]);
 	}
-	if (gettimeofday(&end_tv, 0))
-		perror("End time error...");
-	nr_ctx_switches = nr_yield_threads * nr_yield_loops;
-	usec_diff = (end_tv.tv_sec - start_tv.tv_sec) * 1000000 +
-	            (end_tv.tv_usec - start_tv.tv_usec);
+	/* Stop the clock */
+	end = read_tsc();
 
+	/* Dump the results */
+	nr_ctx_switches = nr_yield_threads * nr_yield_loops;
+	usec_diff = tsc2usec(end - start);
 	if (human_dump) {
 		printf("Done: %d uthreads, %ld loops, %d vcores\n",
 		       nr_yield_threads, nr_yield_loops, nr_vcores);
@@ -111,8 +125,6 @@ int main(int argc, char** argv)
 		printf("Context switches / sec: %lld\n\n",
 		       (1000000LL*nr_ctx_switches / usec_diff));
 	} else {
-		uint64_t start = start_tv.tv_sec * 1000000 + start_tv.tv_usec;
-		uint64_t end = end_tv.tv_sec * 1000000 + end_tv.tv_usec;
-		printf("%d:%lu:%lu\n", nr_vcores, start, end);
+		printf("%d:%lu:%lu:%lu\n", nr_vcores, get_tsc_freq(), start, end);
 	}
 }

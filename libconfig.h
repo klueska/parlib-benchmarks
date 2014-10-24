@@ -22,6 +22,7 @@
 #include <sys/param.h> /* MIN/MAX */
 #include <parlib/arch.h>
 #include <parlib/timing.h>
+#include <parlib/atomic.h>
 
 #define TRUE true
 #define FALSE false
