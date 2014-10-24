@@ -78,9 +78,9 @@ int main(int argc, char** argv)
 #ifndef USE_PTHREAD
 	if (nr_vcores) {
 		upthread_can_vcore_request(FALSE);
-		upthread_can_steal(TRUE);
+		upthread_can_vcore_steal(TRUE);
 		upthread_short_circuit_yield(TRUE);
-		upthread_set_num_vcores(nr_vcores);
+		upthread_set_num_vcores(nr_vcores, 1);
 	}
 #endif
 	/* Create the threads */
