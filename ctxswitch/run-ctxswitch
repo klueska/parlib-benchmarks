@@ -1,30 +1,42 @@
 #! /usr/bin/env bash
 
-: ${NUM_THREADS:=1000}
-: ${NUM_LOOPS:=1000}
+: ${THREADS_PER_CORE:="2 4 8 16 32 64 128 256"}
+: ${LOOPS_PER_THREAD:="500000"}
 : ${HUMAN_DUMP:=0}
 : ${NUM_VCORES:=24}
 
 : ${SEQ_START:=1}
-: ${SEQ_END:=10}
-: ${SLEEP:=5}
+: ${SEQ_END:=1}
+: ${SLEEP:=0}
 
-: ${EXECS:="native-pthread upthread-pvcq"}
+#: ${EXECS:="native-pthread upthread-pvcq"}
+: ${EXECS:="upthread-pvcq"}
 
 BENCHMARK="ctxswitch"
-DIRNAME=data/${BENCHMARK}-out-${NUM_THREADS}-${NUM_LOOPS}
+THREADS_PER_CORE=(${THREADS_PER_CORE})
+LOOPS_PER_CORE=(${LOOPS_PER_CORE})
+
+DIRNAME=data/${BENCHMARK}-out-${LOOPS_PER_THREAD}
 mkdir -p ${DIRNAME}
 
-sleep 30 # Give me time to log out while it runs
+#sleep 30 # Give me time to log out while it runs
 for i in `seq ${SEQ_START} ${SEQ_END}`; do
   for exec in ${EXECS}; do
-    for v in `seq ${NUM_VCORES}`; do
-      taskset -c 0-$(expr ${v} - 1) \
-          ./${exec}-${BENCHMARK} ${NUM_THREADS} ${NUM_LOOPS} \
-                                 ${v} ${HUMAN_DUMP} \
-                                 >> ${DIRNAME}/${exec}-${BENCHMARK}-out-${i}.dat;
-      #echo Finished ${exec} vcores ${v} iteration ${i}
-      sleep ${SLEEP};
+    for j in `seq 0 $(expr ${#THREADS_PER_CORE[@]} - 1)`; do
+      tpc=${THREADS_PER_CORE[$j]}
+      lpc=$(expr ${LOOPS_PER_THREAD} / ${tpc})
+      rm -rf ${DIRNAME}/${exec}-${BENCHMARK}-out-${tpc}-${i}.dat;
+      for v in `seq ${NUM_VCORES}`; do
+        echo "${exec}: ${i}"
+        echo "  v: ${v}"
+        echo "  tpc: ${tpc}"
+        echo "  lpc: ${lpc}"
+        taskset -c 0-$(expr ${v} - 1) \
+            ./${exec}-${BENCHMARK} $(expr ${tpc} \* ${v}) \
+                                   $(expr ${lpc} \* ${v}) ${v} ${HUMAN_DUMP} \
+                                   >> ${DIRNAME}/${exec}-${BENCHMARK}-out-${tpc}-${i}.dat;
+        sleep ${SLEEP};
+      done
     done
   done
 done

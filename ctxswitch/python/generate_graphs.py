@@ -17,6 +17,8 @@ class BenchmarkData:
   def __init__(self, config):
     input_folder = config.input_folder
     self.dir_name = os.path.basename(input_folder)
+    m = re.match('ctxswitch-out-(?P<lpt>.*)', self.dir_name)
+    self.loops_per_thread = int(m.group('lpt'))
     self.files = glob.glob(input_folder + '/*')
     self.data = {}
     map(lambda x: FileData(x, self), self.files)
@@ -24,13 +26,11 @@ class BenchmarkData:
 class FileData:
   def __init__(self, f, bdata):
     self.file_name = os.path.basename(f)
-    m = re.match('(?P<lib>.*)-ctxswitch-out-(?P<tpc>.*)-(?P<lpc>.*)-(?P<iter>.*).dat', self.file_name)
+    m = re.match('(?P<lib>.*)-ctxswitch-out-(?P<tpc>.*)-(?P<iter>.*).dat', self.file_name)
     self.lib = m.group('lib')
     self.threads_per_core = int(m.group('tpc'))
-    self.loops_per_core = int(m.group('lpc'))
     self.iteration = int(m.group('iter'))
     lines = map(lambda x: x.strip().split(':'), file(f).readlines())
-    self.tsc_freq = 3491521267 # Need to fix prog to put this in first line of file and extract from there
     self.vstats = map(lambda x: VcoreStats(x), lines)
     bdata.data.setdefault(self.lib, {})
     bdata.data[self.lib].setdefault(self.threads_per_core, {})
@@ -39,8 +39,9 @@ class FileData:
 class VcoreStats:
   def __init__(self, line):
     self.num_vcores = int(line[0])
-    self.start_time = int(line[1])
-    self.end_time = int(line[2])
+    self.tsc_freq = int(line[1])
+    self.start_time = int(line[2])
+    self.end_time = int(line[3])
 
 def graph_ctxsps(bdata, config):
   title("Average Context Switches / Second (%d runs)" \
@@ -48,16 +49,18 @@ def graph_ctxsps(bdata, config):
   xlabel("Number of Vcores in Use")
   ylabel("Million Context Switches / Second")
   for lib in config.libs.keys():
+    if lib not in bdata.data.keys():
+        continue
     if 'alias' in config.libs[lib]:
         libname = config.libs[lib]['alias']
     else:
         libname = lib
     ctxsps = []
-    for tpc in config.tpc_order:
+
+    for tpc in sorted(bdata.data[lib]):
       for i in bdata.data[lib][tpc].keys():
-        lpc = bdata.data[lib][tpc][i].loops_per_core
-        tsc_freq = bdata.data[lib][tpc][i].tsc_freq
-        c = map(lambda x: ((tpc * lpc * x.num_vcores**2) * tsc_freq) / (x.end_time - x.start_time), bdata.data[lib][tpc][i].vstats)
+        lpc = bdata.loops_per_thread / tpc
+        c = map(lambda x: ((tpc * lpc * x.num_vcores**2) * x.tsc_freq) / (x.end_time - x.start_time), bdata.data[lib][tpc][i].vstats)
         ctxsps.append(c)
       avg_ctxsps = map(lambda x: np.mean(x) / 1000000, np.transpose(ctxsps))
       plot(range(1, len(avg_ctxsps)+1), avg_ctxsps, label=libname+'-%d-tpc' % tpc)
