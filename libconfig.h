@@ -23,9 +23,7 @@
 #include <parlib/arch.h>
 #include <parlib/timing.h>
 #include <parlib/atomic.h>
-
-#define TRUE true
-#define FALSE false
+#include <parlib/parlib.h>
 
 #ifndef PREEMPT_PERIOD
 #define PREEMPT_PERIOD 10000
