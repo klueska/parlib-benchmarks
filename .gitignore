@@ -4,7 +4,6 @@
 data/
 support/*-test
 fixedwork/*-fixedwork
-!fixedwork/run-fixedwork
 ctxswitch*/*-ctxswitch
-!ctxswitch*/run-ctxswitch
 */python/*-graphs-*/
+!*/run-*

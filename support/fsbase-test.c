@@ -71,7 +71,7 @@ void pin_to_core(int core)
 	sched_yield();                                                                         
 }
 
-void single_core_tests(int time, bool human)
+void single_core_tests(int time, bool human, bool rdwr[2])
 {
 	void *tls_addr;
 	uint64_t beg, end;
@@ -106,29 +106,33 @@ void single_core_tests(int time, bool human)
 	pin_to_core(0);
 
 	// Read fs base 
-	count = 0;
-	stop = false;
-	alarm(time);
-	beg = read_tsc();
-	while (!stop) {
-		tls_addr = rdfsbase();
-		count++;
+	if (rdwr[0]) {
+		count = 0;
+		stop = false;
+		alarm(time);
+		beg = read_tsc();
+		while (!stop) {
+			tls_addr = rdfsbase();
+			count++;
+		}
+		dump_results("RD", human);
 	}
-	dump_results("RD", human);
 
 	// Write fs base 
-	count = 0;
-	stop = false;
-	alarm(time);
-	beg = read_tsc();
-	while (!stop) {
-		wrfsbase(tls_addr);
-		count++;
+	if (rdwr[1]) {
+		count = 0;
+		stop = false;
+		alarm(time);
+		beg = read_tsc();
+		while (!stop) {
+			wrfsbase(tls_addr);
+			count++;
+		}
+		dump_results("WR", human);
 	}
-	dump_results("WR", human);
 }
 
-void multi_core_tests(int ncpus, int time, bool human)
+void multi_core_tests(int ncpus, int time, bool human, bool rdwr[2])
 {
 	struct tdata {
 		void *tls_addr;
@@ -288,8 +292,10 @@ void multi_core_tests(int ncpus, int time, bool human)
 	sigaction(SIGALRM, &act, NULL);
 
 	/* Run the tests */
-	run_test("RD", time, rdloop);
-	run_test("WR", time, wrloop);
+	if (rdwr[0])
+		run_test("RD", time, rdloop);
+	if (rdwr[1])
+		run_test("WR", time, wrloop);
 }
 
 void print_header(char *name, int ncpus, int time, bool human)
@@ -305,6 +311,9 @@ int main (int argc, char **argv)
 	int ncpus = 12;
 	int time = 10;
 	bool human = true;
+	bool tests[3] = {[0 ... 2] = true};
+	bool scmc[2] = {[0 ... 1] = true};
+	bool rdwr[2] = {[0 ... 1] = true};
 
 	if (argc > 1)
 		ncpus = strtol(argv[1], 0, 10);										  
@@ -312,20 +321,48 @@ int main (int argc, char **argv)
 		time = strtol(argv[2], 0, 10);									
 	if (argc > 3) 
 		human = strtol(argv[3], 0, 10);											  
+	if (argc > 4) {
+		tests[0] = argv[4][0] - '0';
+		tests[1] = argv[4][1] - '0';
+		tests[2] = argv[4][2] - '0';
+	}
+	if (argc > 5) {
+		scmc[0] = argv[5][0] - '0';
+		scmc[1] = argv[5][1] - '0';
+	}
+	if (argc > 6) {
+		rdwr[0] = argv[6][0] - '0';
+		rdwr[1] = argv[6][1] - '0';
+	}
 
-	print_header("baseline", ncpus, time, human);
-	rdfsbase = null_rdfsbase;
-	wrfsbase = null_wrfsbase;
-	multi_core_tests(ncpus, time, human);
+	if (tests[0]) {
+		print_header("baseline", ncpus, time, human);
+		rdfsbase = null_rdfsbase;
+		wrfsbase = null_wrfsbase;
+		if (scmc[0])
+			single_core_tests(time, human, rdwr);
+		if (scmc[1])
+			multi_core_tests(ncpus, time, human, rdwr);
+	}
 
-	print_header("rd/wrfsbase", ncpus, time, human);
-	rdfsbase = inst_rdfsbase;
-	wrfsbase = inst_wrfsbase;
-	multi_core_tests(ncpus, time, human);
+	if (tests[1]) {
+		print_header("rd/wrfsbase", ncpus, time, human);
+		rdfsbase = inst_rdfsbase;
+		wrfsbase = inst_wrfsbase;
+		if (scmc[0])
+			single_core_tests(time, human, rdwr);
+		if (scmc[1])
+			multi_core_tests(ncpus, time, human, rdwr);
+	}
 
-	print_header("arch_prctl", ncpus, time, human);
-	rdfsbase = sys_rdfsbase;
-	wrfsbase = sys_wrfsbase;
-	multi_core_tests(ncpus, time, human);
+	if (tests[2]) {
+		print_header("arch_prctl", ncpus, time, human);
+		rdfsbase = sys_rdfsbase;
+		wrfsbase = sys_wrfsbase;
+		if (scmc[0])
+			single_core_tests(time, human, rdwr);
+		if (scmc[1])
+			multi_core_tests(ncpus, time, human, rdwr);
+	}
 }
 

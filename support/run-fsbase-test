@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+: ${NUM_CPUS:="1 6 12 24"}
+: ${DURATION:=30}
+: ${HUMAN_DUMP:=0}
+: ${TESTMAP:="011"}
+: ${SCMC:="01"}
+: ${RDWR:="11"}
+
+for i in ${NUM_CPUS}; do
+	./fsbase-test ${i} ${DURATION} ${HUMAN_DUMP} ${TESTMAP} ${SCMC} ${RDWR}
+done
