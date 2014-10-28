@@ -1,0 +1,7 @@
+{
+	"input_files" : {
+	  "a2" : "../data/a2-fsbase-test.dat",
+	  "c77" : "../data/c77-fsbase-test.dat"
+	},
+	"output_folder" : "../data/support-graphs"
+}
