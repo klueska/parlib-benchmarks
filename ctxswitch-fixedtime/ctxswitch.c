@@ -1,159 +1,200 @@
-/* Copyright (c) 2010-14 The Regents of the University of California
+/* Copyright (c) 2014 The Regents of the University of California
  * Kevin Klues <klueska@cs.berkeley.edu>
  * See LICENSE for details. */
 
-#define _GNU_SOURCE /* for pth_yield on linux */
-
+#define _GNU_SOURCE
 #include <stdio.h>
-#include <pthread.h>
-#include <stdlib.h>
+#include <stdint.h>
 #include <unistd.h>
-#include <sys/time.h>
+#include <asm/prctl.h>
+#include <sys/prctl.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <sched.h>
+#include <limits.h>
+#include <sys/sysinfo.h>
+#include <pthread.h>
+#include <parlib/timing.h>
+#include <parlib/arch.h>
+#include <parlib/atomic.h>
 #include "../libconfig.h"
 
-/* Global vars */
-int nr_vcores = 0;
-int nr_threads_per_core = 1;
-int test_duration = 10; /* In seconds. */
-int human_dump = 1;
-
-int nr_threads = 0;
-uint64_t start_time = 0;
-uint64_t stop_time = 0;
-atomic_t stop_counting = ATOMIC_INITIALIZER(0);
-
-/* Threads and their per thread data. We will allocate exactly one thread per
- * vcore for this experiment. */
-struct pt_data {
-	pthread_t thandle;
-	volatile uint64_t yield_count;
-} __attribute__((aligned(ARCH_CL_SIZE)));
-struct pt_data *pt_data;
-uint64_t *yield_count_copy;
-#define thandle(i) (pt_data[i].thandle)
-#define yield_count(i) (pt_data[i].yield_count)
-
-/* Simple Barriers */
-volatile int barrier = 0;
-bool ready = FALSE;
-
-void *yield_thread(void* arg)
-{	
-	uint64_t end_time;
-	int vcoreid = (int)(long)arg;
-
-	/* Wait til all threads are up and running */
-	atomic_add(&barrier, 1);
-	while (barrier != nr_threads)
-		pthread_yield();
-
-	/* Do the loop... */
-	for (uint64_t i=0 ;; i++) {
-		pthread_yield();
-		yield_count(vcoreid)++;
-
-		/* Check the loop counter and see if it's time to end the program.
-		 * This is a little racy in terms of getting an exact count for the
-		 * yields, but it's all in the noise for the benchmark. */
-		end_time = read_tsc();
-		if (end_time > stop_time) {
-			while(!atomic_cas(&stop_counting, 0, 1));
-			/* This break is for the for loop not the while above. Only
-			 * one thread should ever set this variable and break out of
-			 * the loop.  the rest should just sit here forever spinning
-			 * and do no more yielding. */
-			break;
-		}
-	}
-
-	/* Aggregate results if we are the one to break the loop above... */
-
-	/* Qick copy out all the yield counts as fast as possible */
-	for (int i=0; i<nr_threads; i++)
-		yield_count_copy[i] = yield_count(i);	
-
-	/* Now aggregate them */
-	uint64_t total_ctx_switches = 0;
-	for (int i=0; i<nr_threads; i++)
-		total_ctx_switches += yield_count_copy[i];
-
-	/* Dump the results */
-	if (human_dump) {
-		uint64_t usec_diff = tsc2usec(end_time - start_time);
-		printf("Done: %d vcores, %d threads\n", nr_vcores, nr_threads);
-		printf("Nr context switches: %ld\n", total_ctx_switches);
-		printf("Time to run: %ld usec\n", usec_diff);
-		printf("Context switches / sec: %lld\n\n",
-		       (1000000LL*total_ctx_switches / usec_diff));
-	} else {
-		printf("%d:%d:%lu:%lu:%lu:", nr_vcores, nr_threads,
-		                             get_tsc_freq(), start_time, end_time);
-		for (int i=0; i<nr_threads; i++) {
-			printf("%ld", yield_count_copy[i]);
-			if (i != nr_threads-1)
-				printf(":");
-			else
-				printf("\n");
-		}
-	}
-	exit(0);
-
-	return (void*)(long)(pthread_id());
+void pin_to_core(int core)
+{
+	cpu_set_t c;                                                                           
+	CPU_ZERO(&c);
+	CPU_SET(core, &c);
+	sched_setaffinity(0, sizeof(cpu_set_t), &c);
+	sched_yield();                                                                         
 }
 
-int main(int argc, char** argv) 
+void multi_core_tests(int ncpus, int time, bool human)
 {
-	/* Parse the args */
-	if (argc > 1)
-		test_duration = strtol(argv[1], 0, 10);
-	if (argc > 2)
-		nr_threads_per_core = strtol(argv[2], 0, 10);
-	if (argc > 3)
-		nr_vcores = strtol(argv[3], 0, 10);
-	if (argc > 4)
-		human_dump = strtol(argv[4], 0, 10);
+	struct tdata {
+		uint64_t count;
+		bool stop;
+		bool done;
+		uint64_t beg_time;
+		uint64_t end_time;
+	} __attribute__((aligned(ARCH_CL_SIZE)));
 
-	/* Adjust num vcores so we have alot of threads in our queue */
-	nr_threads = nr_threads_per_core * nr_vcores;
+	static int barrier;
+	static void (*run_loop)(int);
+	static char *run_prefix;
+	static pthread_t thread;
+	static uint64_t tsc_freq;
+	static struct tdata *tdata;
+	static bool test_done;
+	tdata = aligned_alloc(ARCH_CL_SIZE, sizeof(struct tdata) * ncpus);
+	tsc_freq = get_tsc_freq();
 
-	/* DUmp some info */
-	if (human_dump)
-		printf("Making %d threads for a %d second test, on %d vcore(s)\n",
-		       nr_threads, test_duration, nr_vcores);
-
-	/* Allocate our threads and per thread data. */
-	pt_data = parlib_aligned_alloc(ARCH_CL_SIZE,
-	              sizeof(struct pt_data) * nr_threads);
-	yield_count_copy = malloc(sizeof(uint64_t) * nr_threads);
-	for (int i=0; i<nr_threads; i++) {
-		yield_count(i) = 0;
-		yield_count_copy[i] = 0;
+	void dump_results(char *prefix, bool human)
+	{
+		if (human) {
+			printf("Multicore %s test:\n", prefix);
+			for (int i=0; i<ncpus; i++) {
+				printf("  Core %2d: ", i);
+				printf("    ops/s: %ld",
+				         tdata[i].count/tsc2msec(tdata[i].end_time 
+						                         - tdata[i].beg_time) * 1000);
+				printf("    latency: %ldns\n",
+				         tsc2nsec(tdata[i].end_time - tdata[i].beg_time)
+						 / tdata[i].count);
+			}
+		} else {
+			for (int i=0; i<ncpus; i++)
+				printf("MC:%s:%d:%ld:%ld:%ld:%ld\n", prefix, i, tsc_freq,
+				       tdata[i].beg_time, tdata[i].end_time, tdata[i].count);
+		}
 	}
 
+	void alarm_handler(int sig)
+	{
+		tdata[0].stop = true;
+
+	}
+
+	void yieldloop(int id) {
+		/* Pull these out to optimize the loop. */
+		volatile bool *stop = &tdata[id].stop;
+		uint64_t *count = &tdata[id].count;
+
+		tdata[id].beg_time = read_tsc();
+		while (!*stop) {
+			pthread_yield();
+			(*count)++;
+		}
+		tdata[id].end_time = read_tsc();
+		tdata[id].done = true;
+	}
+
+	void *thread_handler(void *arg)
+	{
+		int id = (int)(long)arg;
+
+		/* Pin to our core */
+		if (id != 0) {
+			pin_to_core(id);
+			__sync_fetch_and_add(&barrier, 1);
+		}
+
+		/* Checkin and barrier waiting for all threads to come up. */
+		while (barrier < ncpus)
+			cmb();
+
+		/* Run the loop. */
+		run_loop(id);
+	}
+
+	void run_test(char *prefix, int time, void (*test_func)(int))
+	{
+		/* Set up the globals for the test */
+		run_prefix = prefix;
+		run_loop = test_func;
+		barrier = 0;
+		test_done = false;
+		for (int i=0; i<ncpus; i++) {
+			tdata[i].count = 0;
+			tdata[i].stop = 0;
+			tdata[i].done = 0;
+			tdata[i].beg_time = 0;
+			tdata[i].end_time= 0;
+		}
+
 #ifndef USE_PTHREAD
-	if (nr_vcores) {
 		upthread_can_vcore_request(FALSE);
 		upthread_can_vcore_steal(FALSE);
 		upthread_short_circuit_yield(FALSE);
-		upthread_set_num_vcores(nr_vcores, 1);
-		vcore_request(nr_vcores - 1);
-	}
+		upthread_set_num_vcores(ncpus, 1);
 #endif
 
-	/* Create all threads other than 0 */
-	for (int i = 1; i < nr_threads; i++)
-		pthread_create(&thandle(i), NULL, &yield_thread, (void*)(long)i);
+		/* Spawn off 1 thread per core except for core 0. */
+		for (int i=1; i<ncpus; i++)
+			pthread_create(&thread, NULL, thread_handler, (void*)(long)i);
+		
+		/* Wait until now to do our vcore request */
+		vcore_request(ncpus - 1);
 
-	/* Wait til all but one thread are up and running */
-	while (barrier != (nr_threads - 1))
-		pthread_yield();
+		/* Pin myself to core 0. */
+		pin_to_core(0);
 
-	/* Set some times. Do this in this order for better accuracy. */
-	uint64_t test_ticks = (uint64_t)test_duration * get_tsc_freq();
-	start_time = read_tsc();
-	stop_time = test_ticks + start_time;
+		/* Barrier waiting for all other threads to come up. */
+		while (barrier < (ncpus - 1))
+			pthread_yield();
 
-	/* Become thread 0 */
-	yield_thread(0);
+		/* Set the alarm */
+		alarm(time);
+
+		/* Release the threads */
+		barrier++;
+
+		/* Become thread 0 */
+		thread_handler(0);
+
+		/* When we get here, the alarm went off and we need to conclude the
+		 * test. Stop the other threads. */
+		for (int i=1; i<ncpus; i++)
+			tdata[i].stop = true;
+		for (int i=1; i<ncpus; i++)
+			while (!tdata[i].done)
+				cpu_relax();
+		dump_results(run_prefix, human);
+	}
+
+	/* Set up the alarm */
+	struct sigaction act;
+	sigemptyset(&act.sa_mask);
+	act.sa_handler = &alarm_handler;
+	act.sa_flags = 0;
+	sigaction(SIGALRM, &act, NULL);
+
+	/* Run the tests */
+	run_test("CTXSWITCH", time, yieldloop);
 }
+
+void print_header(char *name, int ncpus, int time, bool human)
+{
+	if (human)
+		printf("%s tests: ncpus: %d, duration: %ds\n", name, ncpus, time);
+	else
+		printf("%s:%d:%d\n", name, ncpus, time);
+}
+
+int main (int argc, char **argv)
+{
+	int ncpus = 12;
+	int time = 10;
+	bool human = true;
+
+	if (argc > 1)
+		ncpus = strtol(argv[1], 0, 10);										  
+	if (argc > 2)
+		time = strtol(argv[2], 0, 10);									
+	if (argc > 3) 
+		human = strtol(argv[3], 0, 10);											  
+
+	print_header("ctxswitch", ncpus, time, human);
+	multi_core_tests(ncpus, time, human);
+}
+
 

@@ -37,6 +37,7 @@
     #define pthread_id() pthread_self()
 	#define vcore_id() (-1)
 	#define udelay usleep
+	#define vcore_request(n)
 #elif USE_UPTHREAD | USE_UPTHREAD_JUGGLE | USE_UPTHREAD_PVCQ
 	#if USE_UPTHREAD
 		#include <upthread/upthread.h>
