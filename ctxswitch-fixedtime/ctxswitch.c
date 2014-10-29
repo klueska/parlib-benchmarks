@@ -36,17 +36,16 @@ void multi_core_tests(int ncpus, int tpc, int time, bool human)
 		bool done;
 		uint64_t beg_time;
 		uint64_t end_time;
+		uint64_t tsc_freq;
 	} __attribute__((aligned(ARCH_CL_SIZE)));
 
 	static int barrier;
 	static void (*run_loop)(int);
 	static char *run_prefix;
 	static pthread_t thread;
-	static uint64_t tsc_freq;
 	static struct tdata *tdata;
 	static bool test_done;
 	tdata = aligned_alloc(ARCH_CL_SIZE, sizeof(struct tdata) * ncpus);
-	tsc_freq = get_tsc_freq();
 
 	void dump_results(char *prefix, bool human)
 	{
@@ -63,7 +62,7 @@ void multi_core_tests(int ncpus, int tpc, int time, bool human)
 			}
 		} else {
 			for (int i=0; i<ncpus; i++)
-				printf("MC:%s:%d:%ld:%ld:%ld:%ld\n", prefix, i, tsc_freq,
+				printf("%d:%ld:%ld:%ld:%ld\n", i, tdata[i].tsc_freq,
 				       tdata[i].beg_time, tdata[i].end_time, tdata[i].count);
 		}
 	}
@@ -99,8 +98,12 @@ void multi_core_tests(int ncpus, int tpc, int time, bool human)
 		/* Pin ourselves to our core */
 		pin_to_core(id);
 
-		/* Up the barrier if we aren't one of the threads on core 0. */
+		/* If we aren't one of the threads on core 0. */
 		if (id != 0) {
+			/* Get this core's tsc_frequency if not already set. */
+			if (!tdata[id].tsc_freq)
+				tdata[id].tsc_freq = get_tsc_freq();
+			/* Up the barrier. */
 			__sync_fetch_and_add(&barrier, 1);
 		}
 
@@ -125,6 +128,7 @@ void multi_core_tests(int ncpus, int tpc, int time, bool human)
 			tdata[i].done = 0;
 			tdata[i].beg_time = 0;
 			tdata[i].end_time= 0;
+			tdata[i].tsc_freq = 0;
 		}
 
 #ifndef USE_PTHREAD
@@ -147,6 +151,9 @@ void multi_core_tests(int ncpus, int tpc, int time, bool human)
 
 		/* Pin myself to core 0. */
 		pin_to_core(0);
+
+		/* Get core 0's tsc frequency. */
+		tdata[0].tsc_freq = get_tsc_freq();
 
 		/* Barrier waiting for all other threads to come up. */
 		while (barrier < (ncpus - 1))
