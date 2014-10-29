@@ -1,0 +1,19 @@
+{
+	"input_files" : {
+		"raw-ctxswitch" : "../data/ctxswitch-out/upthread-pvcq-ctxswitch-notls.dat",
+		"swap-tls (wrfsbase)" : "../data/ctxswitch-out/upthread-pvcq-ctxswitch-withtls.dat",
+		"handle-events" : "../data/ctxswitch-out/upthread-pvcq-ctxswitch-events.dat",
+		"use-queue-locks" : "../data/ctxswitch-out/upthread-pvcq-ctxswitch-locks.dat",
+		"save-fpstate" : "../data/ctxswitch-out/upthread-pvcq-ctxswitch-fpstate.dat",
+		"native-pthreads" : "../data/ctxswitch-out/native-pthread-ctxswitch.dat"
+	},
+	"output_folder" : "../data/ctxswitch-graphs",
+
+	"measurement_order":	[
+		"raw-ctxswitch",
+		"swap-tls (wrfsbase)",
+		"handle-events",
+		"use-queue-locks",
+		"save-fpstate"
+	]
+}
