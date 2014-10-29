@@ -28,7 +28,7 @@ void pin_to_core(int core)
 	sched_yield();                                                                         
 }
 
-void multi_core_tests(int ncpus, int time, bool human)
+void multi_core_tests(int ncpus, int tpc, int time, bool human)
 {
 	struct tdata {
 		uint64_t count;
@@ -71,7 +71,6 @@ void multi_core_tests(int ncpus, int time, bool human)
 	void alarm_handler(int sig)
 	{
 		tdata[0].stop = true;
-
 	}
 
 	void yieldloop(int id) {
@@ -79,22 +78,29 @@ void multi_core_tests(int ncpus, int time, bool human)
 		volatile bool *stop = &tdata[id].stop;
 		uint64_t *count = &tdata[id].count;
 
+		/* Do the loop */
 		tdata[id].beg_time = read_tsc();
 		while (!*stop) {
 			pthread_yield();
 			(*count)++;
 		}
-		tdata[id].end_time = read_tsc();
-		tdata[id].done = true;
+
+		/* If we are the first one out on this core, set the end time. */
+		if (!tdata[id].end_time) {
+			tdata[id].end_time = read_tsc();
+			tdata[id].done = true;
+		}
 	}
 
 	void *thread_handler(void *arg)
 	{
 		int id = (int)(long)arg;
 
-		/* Pin to our core */
+		/* Pin ourselves to our core */
+		pin_to_core(id);
+
+		/* Up the barrier if we aren't one of the threads on core 0. */
 		if (id != 0) {
-			pin_to_core(id);
 			__sync_fetch_and_add(&barrier, 1);
 		}
 
@@ -129,8 +135,12 @@ void multi_core_tests(int ncpus, int time, bool human)
 #endif
 
 		/* Spawn off 1 thread per core except for core 0. */
-		for (int i=1; i<ncpus; i++)
-			pthread_create(&thread, NULL, thread_handler, (void*)(long)i);
+		int i = 0, j = 1;
+		for (i; i< tpc; i++) {
+			for (j; j < ncpus; j++)
+				pthread_create(&thread, NULL, thread_handler, (void*)(long)j);
+			j=0;
+		}
 		
 		/* Wait until now to do our vcore request */
 		vcore_request(ncpus - 1);
@@ -140,7 +150,7 @@ void multi_core_tests(int ncpus, int time, bool human)
 
 		/* Barrier waiting for all other threads to come up. */
 		while (barrier < (ncpus - 1))
-			pthread_yield();
+			cmb();
 
 		/* Set the alarm */
 		alarm(time);
@@ -172,29 +182,33 @@ void multi_core_tests(int ncpus, int time, bool human)
 	run_test("CTXSWITCH", time, yieldloop);
 }
 
-void print_header(char *name, int ncpus, int time, bool human)
+void print_header(char *name, int ncpus, int tpc, int time, bool human)
 {
 	if (human)
-		printf("%s tests: ncpus: %d, duration: %ds\n", name, ncpus, time);
+		printf("%s tests: ncpus: %d, tpc: %d, duration: %ds\n",
+		       name, ncpus, tpc, time);
 	else
-		printf("%s:%d:%d\n", name, ncpus, time);
+		printf("%s:%d:%d:%d\n", name, ncpus, tpc, time);
 }
 
 int main (int argc, char **argv)
 {
 	int ncpus = 12;
+	int tpc = 1;
 	int time = 10;
 	bool human = true;
 
 	if (argc > 1)
-		ncpus = strtol(argv[1], 0, 10);										  
+		ncpus = strtol(argv[1], 0, 10);
 	if (argc > 2)
-		time = strtol(argv[2], 0, 10);									
-	if (argc > 3) 
-		human = strtol(argv[3], 0, 10);											  
+		tpc = strtol(argv[2], 0, 10);
+	if (argc > 3)
+		time = strtol(argv[3], 0, 10);
+	if (argc > 4)
+		human = strtol(argv[4], 0, 10);
 
-	print_header("ctxswitch", ncpus, time, human);
-	multi_core_tests(ncpus, time, human);
+	print_header("ctxswitch", ncpus, tpc, time, human);
+	multi_core_tests(ncpus, tpc, time, human);
 }
 
 
