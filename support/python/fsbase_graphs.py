@@ -54,6 +54,7 @@ class VcoreStats:
     self.count = int(line[6])
 
 def graph_rdwrfsbase_helper(bdata, config, which):
+  margin = 0.05
   width = 0.30
   ind = np.arange(4)
   colors = ['#CC2529', '#396AB1', '#3E9651']
@@ -77,16 +78,16 @@ def graph_rdwrfsbase_helper(bdata, config, which):
 		                    /(x.count), eval('data.' + which))
         avgs.append(np.mean(lat))
         vars.append(np.std(lat))
-      p = plt.bar(ind+(order[i]*width), avgs, width, color=colors[i], label=t)
-      e = plt.errorbar(ind+(order[i]*width) + width/2, avgs, yerr=vars, fmt=None, ecolor='k', lw=2, capsize=5, capthick=2)
+      p = plt.bar(margin + ind + order[i]*width, avgs, width, color=colors[i], label=t)
+      e = plt.errorbar(margin + ind + order[i]*width + width/2, avgs, yerr=vars, fmt=None, ecolor='k', lw=2, capsize=5, capthick=2)
       autolabel(p, e, 5)
       ps[order[i]] = p
       labels[order[i]] = t
       i += 1
 
   ylabel('Cycles per operation')
-  xticks(ind+3*width/2.0, ("Single Core", "All cores\n1 Socket\nNo SMT",
-                     "All Cores\n2 Sockets\nNo SMT", "All Cores\n2 Sockets\nFull SMT"))
+  xticks(margin + ind + 3.0/2*width, ("Single Core", "1 Socket\nAll cores\nNo SMT",
+                     "2 Sockets\nAll Cores\nNo SMT", "2 Sockets\nAll Cores\nFull SMT"))
   return ps, labels
 
 def graph_rdfsbase(bdata, config):
