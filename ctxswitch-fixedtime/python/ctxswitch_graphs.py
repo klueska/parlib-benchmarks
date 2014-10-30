@@ -53,7 +53,7 @@ class VcoreStats:
     self.end_time = int(line[3])
     self.count = int(line[4])
 
-def relative_transform(bdata, config, transform):
+def data_transform(bdata, config, transform):
   test = 'ctxswitch'
   lats = {}
   for l in bdata.data:
@@ -63,11 +63,14 @@ def relative_transform(bdata, config, transform):
         lats.setdefault(l, {})
         lats[l].setdefault(n, {})
         lats[l][n][tpc] = lat
+  return lats
 
+def relative_transform(bdata, config, transform):
+  lats = data_transform(bdata, config, transform)
   rlats = {}
   for l in [l for l in bdata.data if l != 'native-pthreads']:
-    for n in bdata.data[l][test]:
-      for tpc in bdata.data[l][test][n]:
+    for n in lats[l]:
+      for tpc in lats[l][n]:
         rlats.setdefault(l, {})
         rlats[l].setdefault(n, {})
         curr = config.measurement_order.index(l)
@@ -96,7 +99,6 @@ def graph_stacked(bdata, config):
                '%d'%int(y), size="10", ha='center', va='bottom')
 
   cyclecalc = lambda x: 1.0*(x.end_time - x.beg_time)/(x.count)
-  #latcalc = lambda x: 1e9/(1.0*x.count*x.tsc_freq/(x.end_time - x.beg_time))
   rdata = relative_transform(bdata, config, cyclecalc)
 
   ps = []
@@ -122,17 +124,25 @@ def graph_stacked(bdata, config):
   gca().add_artist(leg)
 
   l = 'native-pthreads'
-  color = '#808585'
-  avgs = []
-  vars = []
-  for n in num_cores:
-    lats = rdata[l][n][tpc]
-    avgs.append(np.mean(lats))
-    vars.append(np.std(lats))
-  p = plt.bar(margin + ind + width, avgs, width, label=l, color=color)
-  e = plt.errorbar(margin + ind + width + width/2, avgs, yerr=vars, fmt=None, ecolor='k', lw=2, capsize=5, capthick=2)
-  autolabel(p, e, 0)
-  legend([p], [l], bbox_to_anchor=[0.85, 1])
+  colors = ["#EEE8AA", '#C0C0C0']
+  tpcs = [2, 1]
+  ps = []
+  labels = []
+  for i, tpc in enumerate(tpcs):
+    avgs = []
+    vars = []
+    for n in num_cores:
+      lats = rdata[l][n][tpc]
+      avgs.append(np.mean(lats))
+      vars.append(np.std(lats))
+    p = plt.bar(margin + ind + width, avgs, width, label=l, color=colors[i])
+    e = plt.errorbar(margin + ind + width + width/2, avgs, yerr=vars, fmt=None, ecolor='k', lw=2, capsize=5, capthick=2)
+    ps.append(p)
+    labels.append("%d thread%s/core" % (tpc, 's' if tpc > 1 else ''))
+    autolabel(p, e, 0)
+  leg = legend(ps, labels, title="native-pthread", bbox_to_anchor=[0.85, 1])
+  legtitle = leg.get_title()
+  legtitle.set_fontsize(14)
 
   title('Average Cycles Per Context Switch')
   ylabel('Cycles per context switch')
@@ -140,6 +150,56 @@ def graph_stacked(bdata, config):
                      "2 Sockets\nAll Cores\nNo SMT", "2 Sockets\nAll Cores\nFull SMT"))
   figname = config.output_folder + "/ctxswitch-stacked.png"
   savefig(figname)
+  clf()
+
+def graph_tpceffect(bdata, config):
+  tpcalc = lambda x: 1.0*x.count*x.tsc_freq/(x.end_time - x.beg_time)/1e6
+  tdata = data_transform(bdata, config, tpcalc)
+  upthread_data = tdata[config.measurement_order[-1]]
+  pthread_data = tdata['native-pthreads']
+  data = {
+    'upthread': upthread_data,
+    'native-pthreads': pthread_data
+  }
+  colors = ["#396AB1", "#CC2529", "#3E9651", "#948B3D",
+            "#DA7C30", "#535154", "#922428"]
+
+  sums = OrderedDict()
+  for l in data:
+    for n in sorted(data[l].keys()):
+      for tpc in sorted(data[l][n].keys()):
+        lats = data[l][n][tpc]
+        sums.setdefault(l, OrderedDict())
+        sums[l].setdefault(tpc, OrderedDict())
+        sums[l][tpc][n] = np.sum(lats)
+
+  legs = []
+  leg_position = {
+    'upthread': [1,0.75],
+    'native-pthreads': [1,0.25]
+  }
+  for i, l in enumerate(sums):
+    ps = []
+    labels = []
+    for j, tpc in enumerate(sums[l]):
+      if tpc < 128:
+        p = plot(sums[l][tpc].keys(), sums[l][tpc].values(), linewidth=6, color=colors[j])
+        ps.append(p[0])
+        labels.append("%d thread%s/core" % (tpc, 's' if tpc > 1 else ''))
+    leg = legend(ps, labels, loc='center left', title=l, bbox_to_anchor=leg_position[l])
+    for legobj in leg.legendHandles:
+      legobj.set_linewidth(10.0)
+    legtitle = leg.get_title()
+    legtitle.set_fontsize(14)
+    legs.append(leg)
+    if i == 0:
+      gca().add_artist(leg)
+
+  title('Total Context Switches / Second ')
+  ylabel('Millions of Context Switches / Second')
+  xlabel('Number of Cores Used')
+  figname = config.output_folder + "/ctxswitch-tpceffects.png"
+  savefig(figname, bbox_extra_artists=legs, bbox_inches="tight")
   clf()
 
 def ctxswitch_graphs(parser, args):
@@ -156,5 +216,5 @@ def ctxswitch_graphs(parser, args):
     pass
   bdata = BenchmarkData(config)
   graph_stacked(bdata, config)
-  #graph_tpceffect(bdata, config)
+  graph_tpceffect(bdata, config)
 
