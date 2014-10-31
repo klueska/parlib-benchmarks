@@ -50,6 +50,9 @@ void multi_core_tests(int ncpus, int tpc, int time, bool human)
 	void dump_results(char *prefix, bool human)
 	{
 		if (human) {
+			uint64_t tcount = 0;
+			uint64_t max_end_time = 0;
+			uint64_t min_beg_time = LONG_MAX;
 			printf("Multicore %s test:\n", prefix);
 			for (int i=0; i<ncpus; i++) {
 				printf("  Core %2d: ", i);
@@ -59,7 +62,15 @@ void multi_core_tests(int ncpus, int tpc, int time, bool human)
 				printf("    latency: %ldns\n",
 				         tsc2nsec(tdata[i].end_time - tdata[i].beg_time)
 						 / tdata[i].count);
+				tcount += tdata[i].count;
+				max_end_time = MAX(max_end_time, tdata[i].end_time);
+				min_beg_time = MIN(min_beg_time, tdata[i].beg_time);
 			}
+			printf("  Total  : ");
+			printf("    ops/s: %ld",
+			         tcount/tsc2msec(max_end_time - min_beg_time) * 1000);
+			printf("   latency: %ldns\n",
+			         tsc2nsec(max_end_time - min_beg_time)/tcount);
 		} else {
 			for (int i=0; i<ncpus; i++)
 				printf("%d:%ld:%ld:%ld:%ld\n", i, tdata[i].tsc_freq,
