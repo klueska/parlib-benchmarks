@@ -88,8 +88,12 @@ void multi_core_tests(int ncpus, int tpc, int time, bool human)
 		volatile bool *stop = &tdata[id].stop;
 		uint64_t *count = &tdata[id].count;
 
+		/* If we are the first oe in on this core, set the beg time. */
+		if (!tdata[id].beg_time) {
+			tdata[id].beg_time = read_tsc();
+		}
+
 		/* Do the loop */
-		tdata[id].beg_time = read_tsc();
 		while (!*stop) {
 			pthread_yield();
 			(*count)++;
@@ -118,7 +122,7 @@ void multi_core_tests(int ncpus, int tpc, int time, bool human)
 			__sync_fetch_and_add(&barrier, 1);
 		}
 
-		/* Checkin and barrier waiting for all threads to come up. */
+		/* Checkin and barrier waiting for all cpus to come up. */
 		while (barrier < ncpus)
 			cmb();
 
