@@ -150,7 +150,7 @@ void multi_core_tests(int ncpus, int tpc, int time, bool human)
 		upthread_can_vcore_request(FALSE);
 		upthread_can_vcore_steal(FALSE);
 		upthread_short_circuit_yield(FALSE);
-		upthread_set_num_vcores(ncpus, 1);
+		upthread_set_num_vcores(ncpus);
 #endif
 
 		/* Spawn off 1 thread per core except for core 0. */
