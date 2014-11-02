@@ -45,7 +45,7 @@ void multi_core_tests(int ncpus, int tpc, int time, bool human)
 	static pthread_t thread;
 	static struct tdata *tdata;
 	static bool test_done;
-	tdata = aligned_alloc(ARCH_CL_SIZE, sizeof(struct tdata) * ncpus);
+	tdata = aligned_alloc(PGSIZE, sizeof(struct tdata) * ncpus);
 
 	void dump_results(char *prefix, bool human)
 	{
