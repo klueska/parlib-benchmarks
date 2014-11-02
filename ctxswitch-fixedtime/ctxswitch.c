@@ -31,12 +31,13 @@ void pin_to_core(int core)
 void multi_core_tests(int ncpus, int tpc, int time, bool human)
 {
 	struct tdata {
-		uint64_t count;
-		bool stop;
-		bool done;
+		uint64_t tsc_freq;
 		uint64_t beg_time;
 		uint64_t end_time;
-		uint64_t tsc_freq;
+		atomic_t start;
+		bool stop;
+		bool done;
+		uint64_t count;
 	} __attribute__((aligned(ARCH_CL_SIZE)));
 
 	static int barrier;
@@ -108,23 +109,29 @@ void multi_core_tests(int ncpus, int tpc, int time, bool human)
 
 	void *thread_handler(void *arg)
 	{
+#ifdef USE_PTHREAD
 		int id = (int)(long)arg;
-
-		/* Pin ourselves to our core */
 		pin_to_core(id);
+#else
+		int id = vcore_id();
+#endif
 
-		/* If we aren't one of the threads on core 0. */
-		if (id != 0) {
-			/* Get this core's tsc_frequency if not already set. */
-			if (!tdata[id].tsc_freq)
+		/* When barrier == ncpus, we coming in from the main thread, so skip
+		 * all this work that we will have already done. */
+		if (barrier != ncpus) {
+
+			/* If we are the first thread on this core. */
+			if (atomic_cas(&tdata[id].start, 0, 1)) {
+				/* Get this core's tsc_frequency. */
 				tdata[id].tsc_freq = get_tsc_freq();
-			/* Up the barrier. */
-			__sync_fetch_and_add(&barrier, 1);
-		}
+				/* Up the barrier. */
+				__sync_fetch_and_add(&barrier, 1);
+			}
 
-		/* Checkin and barrier waiting for all cpus to come up. */
-		while (barrier < ncpus)
-			cmb();
+			/* Checkin and barrier waiting for all cpus to come up. */
+			while (barrier < ncpus)
+				cmb();
+		}
 
 		/* Run the loop. */
 		run_loop(id);
@@ -138,12 +145,13 @@ void multi_core_tests(int ncpus, int tpc, int time, bool human)
 		barrier = 0;
 		test_done = false;
 		for (int i=0; i<ncpus; i++) {
-			tdata[i].count = 0;
+			tdata[i].tsc_freq = 0;
+			tdata[i].beg_time = 0;
+			tdata[i].end_time = 0;
+			tdata[i].start = ATOMIC_INITIALIZER(0);
 			tdata[i].stop = 0;
 			tdata[i].done = 0;
-			tdata[i].beg_time = 0;
-			tdata[i].end_time= 0;
-			tdata[i].tsc_freq = 0;
+			tdata[i].count = 0;
 		}
 
 #ifndef USE_PTHREAD
