@@ -34,7 +34,7 @@
 	#include <pthread.h>
 	#define test_prep() \
 		calibrate_all_tscs();
-    #define pthread_id() pthread_self()
+	#define pthread_id() pthread_self()
 	#define vcore_id() (-1)
 	#define udelay usleep
 	#define vcore_request(n)
@@ -44,11 +44,17 @@
 		#define test_prep()
 	#elif USE_UPTHREAD_PVCQ
 		#include <upthread-pvcq/upthread.h>
-		#define test_prep()
+		#define test_prep() \
+		{ \
+			upthread_set_num_vcores(max_vcores()); \
+		}
 	#elif USE_UPTHREAD_JUGGLE
 		#include <upthread-juggle/upthread.h>
 		#define test_prep() \
-			upthread_set_sched_period(preempt_period);
+		{ \
+			upthread_set_num_vcores(max_vcores()); \
+			upthread_set_sched_period(preempt_period); \
+		}
 		#define printf(...) \
 		{ \
 			upthread_disable_interrupts(); \
