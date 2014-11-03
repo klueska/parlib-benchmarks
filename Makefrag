@@ -7,6 +7,7 @@ UPTHREAD_EXECS += $(foreach b, $(BENCHMARKS), upthread-$(b))
 UPTHREAD_JUGGLE_EXECS += $(foreach b, $(BENCHMARKS), upthread-juggle-$(b))
 UPTHREAD_YIELD_EXECS = $(foreach b, $(BENCHMARKS), upthread-yield-$b)
 UPTHREAD_PVCQ_EXECS += $(foreach b, $(BENCHMARKS), upthread-pvcq-$(b))
+UPTHREAD_PVCQ_YIELD_EXECS = $(foreach b, $(BENCHMARKS), upthread-pvcq-yield-$b)
 
 NATIVE_EXTRAS += ../native-timing.c
 
@@ -49,6 +50,11 @@ $(call EXEC-RULE, $(1), $(call extract_benchmark, $(1)).c, \
                   $(CFLAGS) -DUSE_UPTHREAD_PVCQ , \
 									$(LDFLAGS) -lupthread-pvcq -lparlib)
 endef
+define UPTHREAD-PVCQ-YIELD-EXEC-RULE
+$(call EXEC-RULE, $(1), $(call extract_benchmark, $(1)).c, \
+                  $(CFLAGS) -DUSE_UPTHREAD_PVCQ -DWITH_YIELD, \
+									$(LDFLAGS) -lupthread-pvcq -lparlib)
+endef
 
 # All the targets
 all: $(EXECS) 
@@ -59,6 +65,7 @@ $(foreach exec, $(UPTHREAD_EXECS), $(eval $(call UPTHREAD-EXEC-RULE, $(exec))))
 $(foreach exec, $(UPTHREAD_JUGGLE_EXECS), $(eval $(call UPTHREAD-JUGGLE-EXEC-RULE, $(exec))))
 $(foreach exec, $(UPTHREAD_YIELD_EXECS), $(eval $(call UPTHREAD-YIELD-EXEC-RULE, $(exec))))
 $(foreach exec, $(UPTHREAD_PVCQ_EXECS), $(eval $(call UPTHREAD-PVCQ-EXEC-RULE, $(exec))))
+$(foreach exec, $(UPTHREAD_PVCQ_YIELD_EXECS), $(eval $(call UPTHREAD-PVCQ-YIELD-EXEC-RULE, $(exec))))
 
 clean:
 	rm -rf $(EXECS)
