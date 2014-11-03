@@ -1,15 +1,15 @@
 #! /usr/bin/env bash
 
-: ${NUM_THREADS:=10000}
-: ${NUM_LOOPS:=100000}
+: ${NUM_THREADS:=1000}
+: ${NUM_LOOPS:=300000}
 : ${FAKE_WORK:=1000}
 : ${HUMAN_DUMP:=0}
 
 : ${SEQ_START:=1}
-: ${SEQ_END:=10}
-: ${SLEEP:=5}
+: ${SEQ_END:=50}
+: ${SLEEP:=1}
 
-: ${EXECS:="native-pthread upthread upthread-yield upthread-juggle"}
+: ${EXECS:="native-pthread upthread-pvcq upthread-pvcq-yield upthread-juggle"}
 : ${PREEMPT_PERIODS:="10000 100000 500000 1000000"}
 
 BENCHMARK="fixedwork"
