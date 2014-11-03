@@ -153,7 +153,7 @@ def graph_stacked(bdata, config):
   xticks(margin + ind + 2*width/2, ("Single Core", "1 Socket\nAll cores\nNo SMT",
                      "2 Sockets\nAll Cores\nNo SMT", "2 Sockets\nAll Cores\nFull SMT"))
   figname = config.output_folder + "/ctxswitch-stacked.png"
-  savefig(figname)
+  savefig(figname, bbox_inches="tight")
   clf()
 
 def graph_tpceffect(bdata, config):
@@ -187,7 +187,7 @@ def graph_tpceffect(bdata, config):
     labels = []
     for j, tpc in enumerate(sums[l]):
       if tpc < 128:
-        p = plot(sums[l][tpc].keys(), sums[l][tpc].values(), linewidth=6, color=colors[j])
+        p = plot(sums[l][tpc].keys(), sums[l][tpc].values(), linewidth=4, color=colors[j])
         ps.append(p[0])
         labels.append("%d thread%s/core" % (tpc, 's' if tpc > 1 else ''))
     leg = legend(ps, labels, loc='center left', title=l, bbox_to_anchor=leg_position[l])

@@ -106,15 +106,15 @@ def graph_completion_times(bdata, config):
       ticks.append(sorted(t))
     avg_ticks = map(lambda x: np.mean(x), np.transpose(ticks))
     avg_time = map(lambda x: x/tsc_freq, avg_ticks)
-    plot(range(len(avg_time)), avg_time, label=libname, linewidth=2,
+    plot(range(len(avg_time)), avg_time, label=libname, linewidth=3,
          color=config.libs[lib]['color'])
-    leg = legend(framealpha=0.5, prop={'size': 10}, 
+    leg = legend(framealpha=0.5, prop={'size': 12},
                  loc=config.graphs['completion_times']['legend_loc'],
                  bbox_to_anchor=config.graphs['completion_times']['legend_bbox_to_anchor'])
   for legobj in leg.legendHandles:
-    legobj.set_linewidth(6.0)
+    legobj.set_linewidth(10.0)
   figname = config.output_folder + "/completion_times.png"
-  savefig(figname)
+  savefig(figname, bbox_inches="tight")
   clf()
 
 def generate_graphs(parser, args):
