@@ -68,18 +68,19 @@ def data_transform(bdata, config, transform):
 def relative_transform(bdata, config, transform):
   lats = data_transform(bdata, config, transform)
   rlats = {}
-  for l in [l for l in bdata.data if l != 'native-pthreads']:
+  for l in [l for l in bdata.data if l != 'native-pthread']:
     for n in lats[l]:
       for tpc in lats[l][n]:
         rlats.setdefault(l, {})
         rlats[l].setdefault(n, {})
-        curr = config.measurement_order.index(l)
-        if curr > 0:
-          lprev = config.measurement_order[curr - 1]
-          rlats[l][n][tpc] = [i - j for i, j in zip(lats[l][n][tpc], lats[lprev][n][tpc])]
-        else:
-          rlats[l][n][tpc] = lats[l][n][tpc]
-  rlats['native-pthreads'] = lats['native-pthreads']
+        if l in config.measurement_order:
+          curr = config.measurement_order.index(l)
+          if curr > 0:
+            lprev = config.measurement_order[curr - 1]
+            rlats[l][n][tpc] = [i - j for i, j in zip(lats[l][n][tpc], lats[lprev][n][tpc])]
+          else:
+            rlats[l][n][tpc] = lats[l][n][tpc]
+  rlats['native-pthread'] = lats['native-pthread']
   return rlats
 
 def graph_stacked(bdata, config):
@@ -96,10 +97,11 @@ def graph_stacked(bdata, config):
   def autolabel(rects, es, offset=0.2):
     for rect, y in zip(rects, es.get_children()[2].get_ydata()):
       plt.text(rect.get_x()+rect.get_width()/2., y + offset,
-               '%d'%int(y), size="10", ha='center', va='bottom')
+               '%dns'%int(y), size="10", ha='center', va='bottom')
 
-  cyclecalc = lambda x: 1.0*(x.end_time - x.beg_time)/(x.count)
-  rdata = relative_transform(bdata, config, cyclecalc)
+  #cyclecalc = lambda x: 1.0*(x.end_time - x.beg_time)/(x.count)
+  latcalc = lambda x: 1e9/x.tsc_freq*(x.end_time - x.beg_time)/(x.count)
+  rdata = relative_transform(bdata, config, latcalc)
 
   ps = []
   labels = []
@@ -123,7 +125,7 @@ def graph_stacked(bdata, config):
   legtitle.set_fontsize(14)
   gca().add_artist(leg)
 
-  l = 'native-pthreads'
+  l = 'native-pthread'
   colors = ["#EEE8AA", '#C0C0C0']
   tpcs = [2, 1]
   ps = []
@@ -143,9 +145,11 @@ def graph_stacked(bdata, config):
   leg = legend(ps, labels, title="native-pthread", bbox_to_anchor=[0.85, 1])
   legtitle = leg.get_title()
   legtitle.set_fontsize(14)
+  x1,x2,y1,y2 = plt.axis()
+  plt.axis((x1,x2,y1,1250))
 
-  title('Average Cycles Per Context Switch')
-  ylabel('Cycles per context switch')
+  title('Average Context Switch Latency (Per Core)')
+  ylabel('Context Switch Latency (ns)')
   xticks(margin + ind + 2*width/2, ("Single Core", "1 Socket\nAll cores\nNo SMT",
                      "2 Sockets\nAll Cores\nNo SMT", "2 Sockets\nAll Cores\nFull SMT"))
   figname = config.output_folder + "/ctxswitch-stacked.png"
@@ -155,11 +159,11 @@ def graph_stacked(bdata, config):
 def graph_tpceffect(bdata, config):
   tpcalc = lambda x: 1.0*x.count*x.tsc_freq/(x.end_time - x.beg_time)/1e6
   tdata = data_transform(bdata, config, tpcalc)
-  upthread_data = tdata[config.measurement_order[-1]]
-  pthread_data = tdata['native-pthreads']
+  upthread_data = tdata['full-long']
+  pthread_data = tdata['native-pthread']
   data = {
     'upthread': upthread_data,
-    'native-pthreads': pthread_data
+    'native-pthread': pthread_data
   }
   colors = ["#396AB1", "#CC2529", "#3E9651", "#948B3D",
             "#DA7C30", "#535154", "#922428"]
@@ -176,7 +180,7 @@ def graph_tpceffect(bdata, config):
   legs = []
   leg_position = {
     'upthread': [1,0.75],
-    'native-pthreads': [1,0.25]
+    'native-pthread': [1,0.25]
   }
   for i, l in enumerate(sums):
     ps = []
@@ -197,7 +201,7 @@ def graph_tpceffect(bdata, config):
 
   title('Total Context Switches / Second ')
   ylabel('Millions of Context Switches / Second')
-  xlabel('Number of Cores Used')
+  xlabel('Number of Cores')
   figname = config.output_folder + "/ctxswitch-tpceffects.png"
   savefig(figname, bbox_extra_artists=legs, bbox_inches="tight")
   clf()
