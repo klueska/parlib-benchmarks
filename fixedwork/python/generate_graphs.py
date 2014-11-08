@@ -85,7 +85,7 @@ def graph_start_times(bdata, config):
   clf()
 
 def graph_completion_times(bdata, config):
-  t = "Average Completion Time Per Thread (%d runs)\n" \
+  t = "Average Thread Completion Time (%d runs)\n" \
     + "%d Threads Running %d Million Iterations Each" 
   title(t % (len(bdata.data.itervalues().next()),
              bdata.num_threads,
