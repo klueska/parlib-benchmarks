@@ -117,6 +117,7 @@ void multi_core_tests(int nthreads, int duration, bool human)
 		/* When id == 0, we are coming in from the main thread, so skip all
 		 * this work that we will have already done. */
 		if (id != 0) {
+			pin_to_core(id);
 			/* Get this core's tsc_frequency. */
 			tdata[id].tsc_freq = get_tsc_freq();
 			/* Up the barrier. */
