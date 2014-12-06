@@ -3,6 +3,7 @@
 *.pyc
 data/
 support/*-test
+support/blast
 fixedwork/*-fixedwork
 ctxswitch*/*-ctxswitch
 readwrite*/*-readwrite
