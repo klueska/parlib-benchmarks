@@ -38,7 +38,7 @@ static void print_stats()
 {
   double t = gettime();
   if (t - t1 >= 5) {
-    printf("%d requests/sec\n", (int)(num_tags / (t - t0)));
+    fprintf(stderr, "%d requests/sec\n", (int)(num_tags / (t - t0)));
     t1 = t;
   }
 }
