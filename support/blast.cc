@@ -20,6 +20,7 @@ struct sample {
 
 static int nc;
 static int rpc;
+static int burst;
 static const char* url;
 static struct sockaddr_in remote;
 static std::atomic<uint64_t> num_tags = ATOMIC_VAR_INIT(0);
@@ -74,42 +75,64 @@ static void* connection(void* arg)
   int id = (uintptr_t)arg;
   int sock;
   ssize_t bytes, tmp;
+  int iter = 0;
+  std::vector<sample>& samples = *(new std::vector<sample>(0));
 
-  if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
-    perror("failed to create socket");
-    exit(1);
-  }
+  while (1) {
+    if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+      perror("failed to create socket");
+      continue; exit(1);
+    }
 
-  if (connect(sock, (struct sockaddr*)&remote, sizeof(struct sockaddr)) < 0) {
-    perror("failed to connect");
-    exit(1);
-  }
+    int yes = 1;
+    if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))) {
+      perror("could not set sockopts");
+      continue; exit(1);
+    }
 
-  std::string query = std::string("GET ") + url + " HTTP/1.1\r\n\r\n";
+    if (connect(sock, (struct sockaddr*)&remote, sizeof(struct sockaddr)) < 0) {
+      perror("failed to connect");
+      continue; exit(1);
+    }
 
-  std::vector<sample>& samples = *(new std::vector<sample>(rpc));
-  for (int i = 0; i < rpc; i++) {
-    samples[i].tag = std::atomic_fetch_add(&num_tags, uint64_t(1));
-    samples[i].send_start = gettime();
-    send_query(sock, query);
-    samples[i].send_stop = gettime();
-  }
+    std::string query = std::string("GET ") + url + " HTTP/1.1\r\n" 
+	                    + "User-Agent: httperf/0.9.1\r\n"
+	                    + "Host: " + inet_ntoa(remote.sin_addr) + "\r\n\r\n";
 
-  for (uint64_t i = rpc; ; i++) {
-    samples[i - rpc].recv_start = gettime();
-    std::vector<char> buf = receive_response(sock);
-    samples[i - rpc].recv_stop = gettime();
-    if (max_samples && samples[i - rpc].tag >= max_samples)
-      break;
+    samples.resize(samples.size() + burst);
+    for (int i = 0; i < burst; i++) {
+      uint64_t idx = iter*rpc + i;
+      samples[idx].send_start = gettime();
+      send_query(sock, query);
+      samples[idx].send_stop = gettime();
+    }
 
-    samples.resize(i + 1);
-    samples[i].tag = std::atomic_fetch_add(&num_tags, uint64_t(1));
-    samples[i].send_start = samples[i - rpc].recv_stop;
-    send_query(sock, query);
-    samples[i].send_stop = gettime();
+    for (uint64_t i = 0; i < rpc; i++) {
+      uint64_t idx = iter*rpc + i;
+      samples[idx].recv_start = gettime();
+      std::vector<char> buf = receive_response(sock);
+      samples[idx].recv_stop = gettime();
+      samples[idx].tag = std::atomic_fetch_add(&num_tags, uint64_t(1));
 
-    if (!max_samples && id == 0)
-      print_stats();
+      if (max_samples && samples[idx].tag >= max_samples) {
+        samples.resize(idx);
+        return &samples;
+      }
+
+      if (i == (rpc - 1))
+        break;
+
+      if (samples.size() <= idx + 1)
+        samples.resize(idx + 2);
+      samples[idx + 1].send_start = samples[idx].recv_stop;
+      send_query(sock, query);
+      samples[idx + 1].send_stop = gettime();
+
+      if (id == 0)
+        print_stats();
+    }
+    close(sock);
+    iter++;
   }
 
   return &samples;
@@ -117,8 +140,8 @@ static void* connection(void* arg)
 
 int main(int argc, char** argv)
 {
-  if (argc < 6 || argc > 7) {
-    printf("usage: blast <ip> <port> <url> <connections> <reqs per conn> [total reqs]\n");
+  if (argc < 7 || argc > 8) {
+    printf("usage: blast <ip> <port> <url> <connections> <reqs per conn> <burst length> [total reqs]\n");
     return 1;
   }
 
@@ -131,9 +154,10 @@ int main(int argc, char** argv)
 
   url = argv[3];
   nc = atoi(argv[4]);
-  rpc = atoi(argv[5]);
-  if (argc >= 7)
-    max_samples = atoll(argv[6]);
+  rpc = atol(argv[5]);
+  burst = atoi(argv[6]);
+  if (argc >= 8)
+    max_samples = atoll(argv[7]);
 
   t0 = t1 = gettime();
 
