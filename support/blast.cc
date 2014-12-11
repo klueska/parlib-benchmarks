@@ -96,8 +96,8 @@ static void* connection(void* arg)
     }
 
     std::string query = std::string("GET ") + url + " HTTP/1.1\r\n" 
-	                    + "User-Agent: httperf/0.9.1\r\n"
-	                    + "Host: " + inet_ntoa(remote.sin_addr) + "\r\n\r\n";
+                        + "User-Agent: httperf/0.9.1\r\n"
+                        + "Host: " + inet_ntoa(remote.sin_addr) + "\r\n\r\n";
 
     samples.resize(samples.size() + burst);
     for (int i = 0; i < burst; i++) {
