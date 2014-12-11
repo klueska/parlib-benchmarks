@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <sys/time.h>
 #include <signal.h>
@@ -43,6 +44,89 @@ static void print_stats()
   }
 }
 
+static int find_crlf(char *buf, int max_len)
+{
+  int loc = -1;
+  int cri = 0;
+  for(int i=0; i<max_len; i++) {
+    if(buf[i] == '\r') {
+      cri = i;
+    }
+    if((cri == (i-1)) && (buf[i] == '\n')) {
+      loc = cri;
+      break;
+    }
+  }
+  return loc;
+}
+
+static int get_response_length(char *src, int max_len)
+{
+  int i = 0;
+  char *curr_line = NULL;
+  int curr_line_len = 0;
+  int content_length = 0;
+  int response_len = 0;
+  while(i < max_len) {
+    curr_line = &src[i];
+    curr_line_len = find_crlf(curr_line, max_len-i);
+    if(curr_line_len < 0) {
+      i = -1; break;
+    }
+    if(curr_line_len == 0) {
+      i += 2; break;
+    }
+    if(curr_line_len > 16 && (!strncmp(curr_line, "Content-Length: ", 16))) {
+      int cls_len = curr_line_len-16;
+      char *cls = (char*)alloca(cls_len+1);
+      cls[cls_len] = '\0';
+      memcpy(cls, &curr_line[16], cls_len);
+      content_length = atoi(cls);
+    }
+    i += curr_line_len+2;
+  }
+  if(i <= 0 || (i+content_length) > max_len)
+    return -1;
+  response_len = i + content_length;
+  return response_len;
+}
+
+static std::vector<char> receive_response(int sock)
+{
+  int ret = 0;
+  ssize_t bytes = 0;
+  std::vector<char> buf(64);
+  while (1) {
+    /* Find a response in the connection buf */
+    int len = get_response_length(&buf[0], buf.size());
+
+    /* If we found one, read in the entire thing, and return it. */
+    if (len > 0) {
+      if (len > buf.size())
+        buf.resize(len);
+      while (bytes < len) {
+        if ((ret = recv(sock, &buf[0] + bytes, len - bytes, 0)) < 0) {
+          perror("failed to recv response");
+          exit(1);
+        }
+        bytes += ret;
+      }
+      return buf;
+    }
+
+    /* Otherwise, try and read in the next request from the socket */
+    if ((ret = recv(sock, &buf[0] + bytes, buf.size() - bytes, 0)) < 0) {
+      perror("failed to recv response");
+      exit(1);
+    }
+
+    /* Update the buf_length and loop back around to try and
+     * extract the response again. */
+    buf.resize(buf.size() * 2);
+    bytes += ret;
+  }
+}
+
 static void send_query(int sock, const std::string& query)
 {
   ssize_t bytes, tmp;
@@ -52,22 +136,6 @@ static void send_query(int sock, const std::string& query)
       exit(1);
     }
   }
-}
-
-static std::vector<char> receive_response(int sock)
-{
-  std::vector<char> buf(64);
-  for (ssize_t bytes = 0, tmp; ; ) {
-    if ((tmp = recv(sock, &buf[0] + bytes, buf.size() - bytes, 0)) < 0) {
-      perror("failed to recv response");
-      exit(1);
-    }
-    bytes += tmp;
-    if (bytes < buf.size())
-      break;
-    buf.resize(buf.size() * 2);
-  }
-  return buf;
 }
 
 static void* connection(void* arg)
