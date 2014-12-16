@@ -22,6 +22,7 @@ struct sample {
 static int nc;
 static int rpc;
 static int burst;
+static int rate;
 static const char* url;
 static struct sockaddr_in remote;
 static std::atomic<uint64_t> num_tags = ATOMIC_VAR_INIT(0);
@@ -143,7 +144,9 @@ static void* connection(void* arg)
   int id = (uintptr_t)arg;
   int sock;
   ssize_t bytes, tmp;
-  int iter = 0;
+  uint64_t iter = 0;
+  uint64_t curriter = 0;
+  double starttime = gettime();
   std::vector<sample>& samples = *(new std::vector<sample>(0));
 
   while (1) {
@@ -182,6 +185,9 @@ static void* connection(void* arg)
       samples[idx].recv_stop = gettime();
       samples[idx].tag = std::atomic_fetch_add(&num_tags, uint64_t(1));
 
+      if (id == 0)
+        print_stats();
+
       if (max_samples && samples[idx].tag >= max_samples) {
         samples.resize(idx);
         return &samples;
@@ -196,11 +202,24 @@ static void* connection(void* arg)
       send_query(sock, query);
       samples[idx + 1].send_stop = gettime();
 
-      if (id == 0)
-        print_stats();
     }
     close(sock);
     iter++;
+    curriter++;
+    if (rate > 0) {
+      double difftime = gettime() - starttime;
+      if (difftime < 1) {
+        bool done = curriter == (uint64_t)(((double)rate)/nc);
+        if (done) {
+          usleep((uint64_t)(1000000 * ((double)1 - difftime)));
+          starttime = gettime();
+          curriter = 0;
+        }
+      } else {
+        starttime = gettime();
+        curriter = 0;
+      }
+    }
   }
 
   return &samples;
@@ -209,7 +228,7 @@ static void* connection(void* arg)
 int main(int argc, char** argv)
 {
   if (argc < 7 || argc > 8) {
-    printf("usage: blast <ip> <port> <url> <connections> <reqs per conn> <burst length> [total reqs]\n");
+    printf("usage: blast <ip> <port> <url> <connection rate> <connection burst> <reqs per conn> <request burst> [total reqs]\n");
     return 1;
   }
 
@@ -221,11 +240,12 @@ int main(int argc, char** argv)
   }
 
   url = argv[3];
-  nc = atoi(argv[4]);
-  rpc = atol(argv[5]);
-  burst = atoi(argv[6]);
-  if (argc >= 8)
-    max_samples = atoll(argv[7]);
+  rate = atoi(argv[4]);
+  nc = atoi(argv[5]);
+  rpc = atol(argv[6]);
+  burst = atoi(argv[7]);
+  if (argc >= 9)
+    max_samples = atoll(argv[8]);
 
   t0 = t1 = gettime();
 

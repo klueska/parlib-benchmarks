@@ -1,0 +1,7 @@
+rm shit
+./blast 169.229.49.42 8080 / 100 10000000000000000000 100 $(expr 1 \* 200000) >> shit;
+curl a2:8080/add_vcores?num_vcores=2;
+for i in `seq 2 24 2`; do
+	./blast 169.229.49.42 8080 / 100 10000000000000000000 100 $(expr $i \* 200000) >> shit;
+	curl a2:8080/add_vcores?num_vcores=2;
+done
