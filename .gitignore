@@ -4,6 +4,7 @@
 data/
 support/*-test
 support/blast
+support/pi
 fixedwork/*-fixedwork
 ctxswitch*/*-ctxswitch
 readwrite*/*-readwrite
