@@ -23,7 +23,6 @@
 #include <parlib/arch.h>
 #include <parlib/timing.h>
 #include <parlib/atomic.h>
-#include <parlib/parlib.h>
 
 #ifndef PREEMPT_PERIOD
 #define PREEMPT_PERIOD 10000
@@ -57,11 +56,10 @@
 		}
 		#define printf(...) \
 		{ \
-			upthread_disable_interrupts(); \
 			printf(__VA_ARGS__); \
-			upthread_enable_interrupts(); \
 		}
 	#endif
+	#include <parlib/parlib.h>
 	#define pthread_yield upthread_yield
 	#define pthread_t upthread_t
 	#define pthread_create upthread_create
