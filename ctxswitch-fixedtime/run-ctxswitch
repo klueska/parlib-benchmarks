@@ -1,8 +1,8 @@
 #! /usr/bin/env bash
 
 : ${TEST_DURATION:="5"}
-: ${THREADS_PER_CORE:="1 2 4 8 16 32 64 128 256 512 1024"}
-: ${NUM_VCORES:="$(seq 24)"}
+: ${THREADS_PER_CORE:="1 2 4 8 16 32 64"}
+: ${NUM_VCORES:="$(seq 32)"}
 : ${HUMAN_DUMP:=0}
 
 : ${EXEC:="upthread-pvcq"}

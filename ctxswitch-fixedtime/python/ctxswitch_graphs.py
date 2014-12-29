@@ -86,7 +86,7 @@ def relative_transform(bdata, config, transform):
 def graph_stacked(bdata, config):
   libs = ['raw-ctxswitch', 'handle-events', 'use-queue-locks',
           'swap-tls (wrfsbase)', 'save-fpstate']
-  num_cores = [1, 6, 12, 24]
+  num_cores = [1, 8, 16, 32]
   tpc = 1
 
   margin = 0.10
@@ -146,7 +146,7 @@ def graph_stacked(bdata, config):
   legtitle = leg.get_title()
   legtitle.set_fontsize(14)
   x1,x2,y1,y2 = plt.axis()
-  plt.axis((x1,x2,y1,1250))
+  plt.axis((x1,x2,y1,1450))
 
   title('Average Context Switch Latency (Per Core)')
   ylabel('Context Switch Latency (ns)')
