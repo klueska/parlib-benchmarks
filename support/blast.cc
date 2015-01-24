@@ -96,7 +96,7 @@ static std::vector<char> receive_response(int sock)
 {
   int ret = 0;
   ssize_t bytes = 0;
-  std::vector<char> buf(64);
+  std::vector<char> buf(241);
   while (1) {
     /* Find a response in the connection buf */
     int len = get_response_length(&buf[0], buf.size());
@@ -123,7 +123,7 @@ static std::vector<char> receive_response(int sock)
 
     /* Update the buf_length and loop back around to try and
      * extract the response again. */
-    buf.resize(buf.size() * 2);
+    buf.resize(buf.size() + 1);
     bytes += ret;
   }
 }
