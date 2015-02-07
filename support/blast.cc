@@ -26,6 +26,7 @@ static int rate;
 static const char* url;
 static struct sockaddr_in remote;
 static std::atomic<uint64_t> num_tags = ATOMIC_VAR_INIT(0);
+static std::atomic<uint64_t> last_tag = ATOMIC_VAR_INIT(0);
 static double t0, t1;
 static uint64_t max_samples;
 
@@ -40,7 +41,9 @@ static void print_stats()
 {
   double t = gettime();
   if (t - t1 >= 5) {
-    fprintf(stderr, "%d requests/sec\n", (int)(num_tags / (t - t0)));
+    uint64_t curr_tag = std::atomic_load(&num_tags);
+    fprintf(stderr, "%d requests/sec\n", (int)((curr_tag-last_tag) / (t - t1)));
+    last_tag = curr_tag;
     t1 = t;
   }
 }
