@@ -173,7 +173,7 @@ static void* connection(void* arg)
                         + "User-Agent: httperf/0.9.1\r\n"
                         + "Host: " + inet_ntoa(remote.sin_addr) + "\r\n\r\n";
 
-    samples.resize(samples.size() + burst);
+    samples.resize(samples.size() + rpc);
     for (int i = 0; i < burst; i++) {
       uint64_t idx = iter*rpc + i;
       samples[idx].send_start = gettime();
@@ -182,29 +182,27 @@ static void* connection(void* arg)
     }
 
     for (uint64_t i = 0; i < rpc; i++) {
-      uint64_t idx = iter*rpc + i;
-      samples[idx].recv_start = gettime();
+      uint64_t ridx = iter*rpc + i;
+      uint64_t sidx = iter*rpc + i + burst;
+      samples[ridx].recv_start = gettime();
       std::vector<char> buf = receive_response(sock);
-      samples[idx].recv_stop = gettime();
-      samples[idx].tag = std::atomic_fetch_add(&num_tags, uint64_t(1));
+      samples[ridx].recv_stop = gettime();
+      samples[ridx].tag = std::atomic_fetch_add(&num_tags, uint64_t(1));
 
       if (id == 0)
         print_stats();
 
-      if (max_samples && samples[idx].tag >= max_samples) {
-        samples.resize(idx);
+      if (max_samples && samples[ridx].tag >= max_samples) {
+        samples.resize(ridx);
         return &samples;
       }
 
-      if (i == (rpc - 1))
-        break;
+      if (i >= (rpc - burst))
+        continue;
 
-      if (samples.size() <= idx + 1)
-        samples.resize(idx + 2);
-      samples[idx + 1].send_start = samples[idx].recv_stop;
+      samples[sidx].send_start = samples[ridx].recv_stop;
       send_query(sock, query);
-      samples[idx + 1].send_stop = gettime();
-
+      samples[sidx].send_stop = gettime();
     }
     close(sock);
     iter++;
