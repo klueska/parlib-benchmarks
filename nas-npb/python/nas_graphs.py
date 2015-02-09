@@ -56,6 +56,8 @@ class FileData:
         testlines[test].append(lines[startline:i])
         test = m.group('test')
         startline = i
+    testlines.setdefault(test, [])
+    testlines[test].append(lines[startline:])
 
     # Parse each set of tests
     tregex = re.compile("^\s*Time in seconds\s*=\s*(?P<time>.*)$")
