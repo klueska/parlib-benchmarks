@@ -178,7 +178,11 @@ def graph_runtime(bdata, config):
     "native-pthreads (16 cores)",
     "upthreads (16 cores)",
   ]
-  plt.legend(ps, labels, loc="lower center")
+  leg = plt.legend(ps, labels, loc="lower center")
+  for legobj in leg.legendHandles:
+    legobj.set_linewidth(10.0)
+  legtitle = leg.get_title()
+  legtitle.set_fontsize(14)
   figname = config.output_folder + "/nas-runtimes.png"
   savefig(figname, bbox_inches="tight")
   clf()
