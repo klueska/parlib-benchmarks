@@ -95,11 +95,10 @@ static int get_response_length(char *src, int max_len)
   return response_len;
 }
 
-static std::vector<char> receive_response(int sock)
+static int receive_response(int sock, std::vector<char> &buf)
 {
   int ret = 0;
   ssize_t bytes = 0;
-  std::vector<char> buf(241);
   while (1) {
     /* Find a response in the connection buf */
     int len = get_response_length(&buf[0], buf.size());
@@ -115,7 +114,7 @@ static std::vector<char> receive_response(int sock)
         }
         bytes += ret;
       }
-      return buf;
+      return 0;
     }
 
     /* Otherwise, try and read in the next request from the socket */
@@ -182,10 +181,12 @@ static void* connection(void* arg)
     }
 
     for (uint64_t i = 0; i < rpc; i++) {
+      std::vector<char> buf(241);
       uint64_t ridx = iter*rpc + i;
       uint64_t sidx = iter*rpc + i + burst;
       samples[ridx].recv_start = gettime();
-      std::vector<char> buf = receive_response(sock);
+      if (receive_response(sock, buf) < 0)
+        goto error;
       samples[ridx].recv_stop = gettime();
       samples[ridx].tag = std::atomic_fetch_add(&num_tags, uint64_t(1));
 
@@ -204,6 +205,7 @@ static void* connection(void* arg)
       send_query(sock, query);
       samples[sidx].send_stop = gettime();
     }
+error:
     close(sock);
     iter++;
     curriter++;
