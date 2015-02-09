@@ -13,6 +13,7 @@ from pylab import *
 from collections import OrderedDict
 import numpy as np
 import pprint
+import matplotlib.ticker as ticker
 
 class BenchmarkData:
   def __init__(self, config):
@@ -78,6 +79,35 @@ class FileData:
                     tdata[t].setdefault('mopspt', [])
                     tdata[t]['mopspt'].append(float(m.group('mopspt')))
 
+def get_absolute_metrics(bdata, metric):
+  avg_metrics = {}
+  ncores = []
+  for lib in bdata.data:
+    for n in bdata.data[lib]:
+      ncores.append(n) if n not in ncores else None
+      for test in bdata.data[lib][n]:
+        data = bdata.data[lib][n][test][metric]
+        avg_metrics.setdefault(n, {})
+        avg_metrics[n].setdefault(test, {})
+        avg_metrics[n][test][lib] = np.mean(data)
+  ncores.sort()
+  absolute_metric = {}
+  for n in avg_metrics:
+    for test in avg_metrics[n]:
+      t1 = avg_metrics[n][test]['upthread']
+      t2 = avg_metrics[n][test]['native']
+      absolute_metric.setdefault(n, {})
+      absolute_metric[n][test] = [t1, t2]
+  def keyfunc(x):
+    t1 = absolute_metric[ncores[0]][x][0]
+    t2 = absolute_metric[ncores[0]][x][1]
+    s = t2/t1 - 1
+    return s
+  tests = sorted(absolute_metric[ncores[0]], key=keyfunc, reverse=True)
+  absolute_metrics0 = [ absolute_metric[ncores[0]][t] for t in tests ]
+  absolute_metrics1 = [ absolute_metric[ncores[1]][t] for t in tests ]
+  return [tests, absolute_metrics0, absolute_metrics1]
+
 def get_relative_metrics(bdata, metric):
   avg_metrics = {}
   ncores = []
@@ -103,6 +133,55 @@ def get_relative_metrics(bdata, metric):
   relative_metrics1 = [ relative_metric[ncores[1]][t] for t in tests ]
   return [tests, relative_metrics0, relative_metrics1]
 
+def graph_runtime(bdata, config):
+  tests, runtimes0, runtimes1 = get_absolute_metrics(bdata, 'time')
+
+  margin = 0.2
+  ind = np.arange(len(tests))
+  colors = ["#396AB1", "#CC2529", "#3E9651", "#948B3D"]
+
+  def autolabel(ax, y, factor, va):
+    p = ax.text(0.5 + ind[i], y*(1 + factor), "%.2fs"%float(y), size="10", ha='center', va=va)
+    return p
+
+  fig, ax = plt.subplots()
+  axes = [ax] + map(lambda x: ax.twinx(), range(len(tests) - 1))
+  ax = axes[0]
+  for i, t in enumerate(tests):
+    p0 = axes[i].hlines(runtimes0[i][1], margin + ind[i], margin + ind[i] + (1 - 2*margin), linewidth=4, color=colors[0])
+    p1 = axes[i].hlines(runtimes0[i][0], margin + ind[i], margin + ind[i] + (1 - 2*margin), linewidth=4, color=colors[1])
+    p2 = axes[i].hlines(runtimes1[i][1], margin + ind[i], margin + ind[i] + (1 - 2*margin), linewidth=4, color=colors[2])
+    p3 = axes[i].hlines(runtimes1[i][0], margin + ind[i], margin + ind[i] + (1 - 2*margin), linewidth=4, color=colors[3])
+    maxy = max(runtimes0[i][0], runtimes0[i][1], runtimes1[i][0], runtimes1[i][1])
+    miny = min(runtimes0[i][0], runtimes0[i][1], runtimes1[i][0], runtimes1[i][1])
+    axes[i].set_ylim(0, 1.10*maxy)
+    autolabel(axes[i], maxy, 0.02, 'bottom')
+    autolabel(axes[i], miny, -0.02, 'top')
+
+  axes[-1].yaxis.set_label_position("left")
+  plt.title('Absolute Runtime of NAS Parallel Benchmarks (20 runs)')
+  plt.ylabel('Absolute Runtime (s)')
+  ax.xaxis.set_major_formatter(ticker.NullFormatter())
+  ax.xaxis.set_minor_locator(ticker.FixedLocator(0.5 + np.arange(len(tests))))
+  ax.xaxis.set_minor_formatter(ticker.FixedFormatter(tests))
+  for tick in ax.xaxis.get_minor_ticks():
+      tick.tick1line.set_markersize(0)
+      tick.tick2line.set_markersize(0)
+  for axis in axes[1:]:
+    axis.get_yaxis().set_ticks([])
+  ax.get_yaxis().set_ticklabels([0])
+
+  ps = [p0, p1, p2, p3]
+  labels = [
+    "native-pthreads (32 cores)",
+    "upthreads (32 cores)",
+    "native-pthreads (16 cores)",
+    "upthreads (16 cores)",
+  ]
+  plt.legend(ps, labels, loc="lower center")
+  figname = config.output_folder + "/nas-runtimes.png"
+  savefig(figname, bbox_inches="tight")
+  clf()
 
 def graph_speedup(bdata, config):
   tests, speedups0, speedups1 = get_relative_metrics(bdata, 'time')
@@ -112,14 +191,35 @@ def graph_speedup(bdata, config):
   ind = np.arange(len(tests))
   colors = ['#396AB1', '#CC2529']#, '#3E9651', 'yellow', '#DA7C30']
 
+  def autolabel(ax, rects):
+    for rect in rects:
+      x = rect.get_x() + rect.get_width()/2.
+      y = rect.get_height()
+      offset = 0.005
+      va = 'bottom'
+      if rect.get_y() < 0:
+        y = -y
+        offset = -offset
+        va = 'top'
+      ax.text(x, y+offset, '%.1f%%'%(100*float(y)), size="10", ha='center', va=va)
+
   fig, ax = plt.subplots()
   p0 = ax.bar(margin + ind, speedups0, width, color=colors[0])
   p1 = ax.bar(margin + ind, speedups1, width, color=colors[1])
-  ls = ['Full SMT', 'No SMT']
+  autolabel(ax, p0)
+  autolabel(ax, p1)
+  ls = ['Full SMT (32 cores)', 'No SMT (16 cores)']
   title('Average Speedup of NAS Parallel Benchmarks (20 runs)') 
   ylabel('Percent Speedup (%)')
-  xticks(margin + ind + width/2, tests)
   yticks(ax.get_yticks(), map(lambda x: "%s%%" % (x*100), ax.get_yticks()))
+  ax.xaxis.set_major_formatter(ticker.NullFormatter())
+  ax.xaxis.set_minor_locator(ticker.FixedLocator(0.5 + np.arange(len(tests))))
+  ax.xaxis.set_minor_formatter(ticker.FixedFormatter(tests))
+  for tick in ax.xaxis.get_minor_ticks():
+      tick.tick1line.set_markersize(0)
+      tick.tick2line.set_markersize(0)
+  x1,x2,y1,y2 = ax.axis()
+  ax.axis((x1,x2,y1,0.85))
   ax.legend([p0, p1], ls, loc='best')
   figname = config.output_folder + "/nas-speedup.png"
   savefig(figname, bbox_inches="tight")
@@ -136,11 +236,16 @@ def graph_mops(bdata, config):
   fig, ax = plt.subplots()
   p0 = ax.bar(margin + ind, speedups0, width, color=colors[0])
   p1 = ax.bar(margin + ind, speedups1, width, color=colors[1])
-  ls = ['Full SMT', 'No SMT']
+  ls = ['Full SMT (32 cores)', 'No SMT (16 cores)']
   title('Average Speedup of NAS Parallel Benchmarks (20 runs)') 
   ylabel('Percent Speedup (%)')
-  xticks(margin + ind + width/2, tests)
   yticks(ax.get_yticks(), map(lambda x: "%s%%" % (x*100), ax.get_yticks()))
+  ax.xaxis.set_major_formatter(ticker.NullFormatter())
+  ax.xaxis.set_minor_locator(ticker.FixedLocator(0.5 + np.arange(len(tests))))
+  ax.xaxis.set_minor_formatter(ticker.FixedFormatter(tests))
+  for tick in ax.xaxis.get_minor_ticks():
+      tick.tick1line.set_markersize(0)
+      tick.tick2line.set_markersize(0)
   ax.legend([p0, p1], ls, loc='best')
   figname = config.output_folder + "/nas-mops.png"
   savefig(figname, bbox_inches="tight")
@@ -157,11 +262,16 @@ def graph_mopspt(bdata, config):
   fig, ax = plt.subplots()
   p0 = ax.bar(margin + ind, speedups0, width, color=colors[0])
   p1 = ax.bar(margin + ind, speedups1, width, color=colors[1])
-  ls = ['Full SMT', 'No SMT']
+  ls = ['Full SMT (32 cores)', 'No SMT (16 cores)']
   title('Average Speedup of NAS Parallel Benchmarks (20 runs)') 
   ylabel('Percent Speedup (%)')
-  xticks(margin + ind + width/2, tests)
   yticks(ax.get_yticks(), map(lambda x: "%s%%" % (x*100), ax.get_yticks()))
+  ax.xaxis.set_major_formatter(ticker.NullFormatter())
+  ax.xaxis.set_minor_locator(ticker.FixedLocator(0.5 + np.arange(len(tests))))
+  ax.xaxis.set_minor_formatter(ticker.FixedFormatter(tests))
+  for tick in ax.xaxis.get_minor_ticks():
+      tick.tick1line.set_markersize(0)
+      tick.tick2line.set_markersize(0)
   ax.legend([p0, p1], ls, loc='best')
   figname = config.output_folder + "/nas-mopspt.png"
   savefig(figname, bbox_inches="tight")
@@ -180,6 +290,7 @@ def nas_graphs(parser, args):
   except:
     pass
   bdata = BenchmarkData(config)
+  graph_runtime(bdata, config)
   graph_speedup(bdata, config)
   graph_mops(bdata, config)
   graph_mopspt(bdata, config)
