@@ -45,18 +45,20 @@
 		#include <upthread-pvcq/upthread.h>
 		#define test_prep() \
 		{ \
+			upthread_can_vcore_request(false); \
+			upthread_can_vcore_steal(false); \
 			upthread_set_num_vcores(max_vcores()); \
+			vcore_request(max_vcores() - 1); \
 		}
 	#elif USE_UPTHREAD_JUGGLE
 		#include <upthread-juggle/upthread.h>
 		#define test_prep() \
 		{ \
+			upthread_can_vcore_request(false); \
+			upthread_can_vcore_steal(false); \
 			upthread_set_num_vcores(max_vcores()); \
 			upthread_set_sched_period(preempt_period); \
-		}
-		#define printf(...) \
-		{ \
-			printf(__VA_ARGS__); \
+			vcore_request(max_vcores() - 1); \
 		}
 	#endif
 	#include <parlib/parlib.h>
