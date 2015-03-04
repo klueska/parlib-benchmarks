@@ -1,12 +1,13 @@
 #! /usr/bin/env bash
 
-: ${NUM_THREADS:=1000}
+: ${NUM_THREADS:=1024}
 : ${NUM_LOOPS:=300000}
 : ${FAKE_WORK:=1000}
 : ${HUMAN_DUMP:=0}
 
 : ${SEQ_START:=1}
 : ${SEQ_END:=50}
+: ${INIT_SLEEP:=30}
 : ${SLEEP:=1}
 
 : ${EXECS:="native-pthread upthread-pvcq upthread-pvcq-yield upthread-juggle"}
@@ -28,7 +29,7 @@ run-iteration() {
                          > ${DIRNAME}/${exec}-${PERIOD_MOD}${BENCHMARK}-out-${i}.dat;
 }
 
-sleep 30 # Give me time to log out while it runs
+sleep ${INIT_SLEEP} # Give me time to log out while it runs
 for i in `seq ${SEQ_START} ${SEQ_END}`; do
   for exec in ${EXECS}; do
     if [ "${exec}" = 'upthread-juggle' ]; then
