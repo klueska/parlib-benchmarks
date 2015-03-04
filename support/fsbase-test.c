@@ -97,7 +97,7 @@ void single_core_tests(int time, bool human, bool rdwr[2])
 			printf("Single core %s fsbase:\n", prefix);
 			printf("  Core %2d: ", 0);
 			printf("    ops/s: %ld", count/tsc2msec(end - beg) * 1000);
-			printf("    latency: %ldns\n", tsc2nsec(end - beg)/count);
+			printf("    latency: %ldns, %ld cycles\n", tsc2nsec(end - beg)/count, (end - beg)/count);
 		} else {
 			printf("SC:%s:%ld:%ld:%ld:%ld\n", prefix, tsc_freq, beg, end, count);
 		}
