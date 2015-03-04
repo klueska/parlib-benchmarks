@@ -142,7 +142,7 @@ def graph_stacked(bdata, config):
     ps.append(p)
     labels.append("%d thread%s/core" % (tpc, 's' if tpc > 1 else ''))
     autolabel(p, e, 0)
-  leg = legend(ps, labels, title="native-pthread", bbox_to_anchor=[0.85, 1])
+  leg = legend(ps, labels, title="Linux-NPTL", bbox_to_anchor=[0.85, 1])
   legtitle = leg.get_title()
   legtitle.set_fontsize(14)
   x1,x2,y1,y2 = plt.axis()
@@ -150,8 +150,8 @@ def graph_stacked(bdata, config):
 
   title('Average Context Switch Latency (Per Core)')
   ylabel('Context Switch Latency (ns)')
-  xticks(margin + ind + 2*width/2, ("Single Core", "1 Socket\nAll cores\nNo SMT",
-                     "2 Sockets\nAll Cores\nNo SMT", "2 Sockets\nAll Cores\nFull SMT"))
+  xticks(margin + ind + 2*width/2, ("Single Core", "1 Socket\nAll cores\nNo Hyperthreads",
+                     "2 Sockets\nAll Cores\nNo Hyperthreads", "2 Sockets\nAll Cores\nFull Hyperthreads"))
   figname = config.output_folder + "/ctxswitch-stacked.png"
   savefig(figname, bbox_inches="tight")
   clf()
@@ -163,7 +163,7 @@ def graph_tpceffect(bdata, config):
   pthread_data = tdata['native-pthread']
   data = {
     'upthread': upthread_data,
-    'native-pthread': pthread_data
+    'Linux-NPTL': pthread_data
   }
   colors = ["#396AB1", "#CC2529", "#3E9651", "#948B3D",
             "#DA7C30", "#535154", "#922428"]
@@ -176,11 +176,27 @@ def graph_tpceffect(bdata, config):
         sums.setdefault(l, OrderedDict())
         sums[l].setdefault(tpc, OrderedDict())
         sums[l][tpc][n] = np.sum(lats)
+  #print json.dumps(sums, indent=4)
+
+  slopes = OrderedDict()
+  for i, l in enumerate(sums):
+    for j, tpc in enumerate(sums[l]):
+      slopes.setdefault(l, OrderedDict())
+      slopes[l].setdefault(tpc, OrderedDict())
+      x = np.array(range(1, 17))
+      y = np.array([sums[l][tpc][i] for i in x])
+      A = np.vstack([x, np.ones(len(y))]).T
+      slopes[l][tpc][0] = np.linalg.lstsq(A, y)[0].tolist()
+      x = np.array(range(17, 33))
+      y = np.array([sums[l][tpc][i] for i in x])
+      A = np.vstack([x, np.ones(len(y))]).T
+      slopes[l][tpc][1] = np.linalg.lstsq(A, y)[0].tolist()
+  #print json.dumps(slopes, indent=4)
 
   legs = []
   leg_position = {
     'upthread': [1,0.75],
-    'native-pthread': [1,0.25]
+    'Linux-NPTL': [1,0.25]
   }
   for i, l in enumerate(sums):
     ps = []
