@@ -18,6 +18,7 @@
  * See COPYING for details on the GNU General Public License.
  */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <malloc.h>
 #include <stdlib.h>
@@ -32,6 +33,7 @@ int nr_loops = 1;
 int fake_work = 0;
 int human_dump = 1;
 int preempt_period = PREEMPT_PERIOD;
+static int barrier = 0;
 
 struct stats {
 	uint64_t create_time;
@@ -58,7 +60,8 @@ static void parse_args(int argc, char **argv)
 		preempt_period = strtol(argv[5], 0, 10);
 }
 
-static void dump_stats(int i, struct stats *stats, int human)
+static void dump_stats(int i, struct stats *stats, uint64_t prog_start,
+                       uint64_t prog_end, int human)
 {
 	if (!human) {
 		printf("%d:%ld:%ld:%ld:%ld\n", i, stats->create_time,
@@ -68,11 +71,13 @@ static void dump_stats(int i, struct stats *stats, int human)
 		uint64_t end_time = tsc2msec(stats->end_time - stats->create_time);
 		uint64_t compute_time = tsc2msec(stats->end_time - stats->start_time);
 		uint64_t run_time = tsc2msec(stats->join_time - stats->create_time);
-		printf("id:           %d\n", i);
-		printf("start_time:   %ldms\n", start_time);
-		printf("end_time:     %ldms\n", end_time);
-		printf("compute_time: %ldms\n", compute_time);
-		printf("run_time:     %ldms\n", run_time);
+		uint64_t completion_time = tsc2msec(stats->end_time - prog_start);
+		printf("id:              %d\n", i);
+		printf("start_time:      %ldms\n", start_time);
+		printf("end_time:        %ldms\n", end_time);
+		printf("compute_time:    %ldms\n", compute_time);
+		printf("run_time:        %ldms\n", run_time);
+		printf("completion_time: %ldms\n", completion_time);
 		printf("\n");
 	}
 }
@@ -80,6 +85,13 @@ static void dump_stats(int i, struct stats *stats, int human)
 static void *__thread_wrapper(void *arg)
 {
 	int id = (int)(long)arg;
+
+	/* Up the barrier. */
+	__sync_fetch_and_add(&barrier, 1);
+
+	/* Checkin and barrier waiting for all cpus to come up. */
+	while (barrier < nr_threads)
+		pthread_yield();
 
 	/* Let the games begin! */
 	tstats[id].start_time = read_tsc();
@@ -103,12 +115,23 @@ int main(int argc, char **argv)
 	test_prep();
 
 	/* Let the games begin! */
-	uint64_t prog_start = read_tsc();
-	for (int i=0; i<nr_threads; i++) {
+	for (int i=1; i<nr_threads; i++) {
 		tstats[i].create_time = read_tsc();
 		pthread_create(&thandles[i], NULL, __thread_wrapper, (void*)(long)i);
 	}
-	for (int i=0; i<nr_threads; i++) {
+
+	/* Wait to start the measurement. */
+	while (barrier < (nr_threads - 1))
+		pthread_yield();
+	uint64_t prog_start = read_tsc();
+
+	/* Become thread 0 */
+	tstats[0].create_time = read_tsc();
+	__thread_wrapper(0);
+	tstats[0].join_time = read_tsc();
+
+	/* Join on all the remaining threads */
+	for (int i=1; i<nr_threads; i++) {
 		pthread_join(thandles[i], NULL);
 		tstats[i].join_time = read_tsc();
 	}
@@ -118,7 +141,7 @@ int main(int argc, char **argv)
 	if (!human_dump)
 		printf("%ld:%ld:%ld\n", get_tsc_freq(), prog_start, prog_end);
 	for (int i=0; i<nr_threads; i++) {
-		dump_stats(i, &tstats[i], human_dump);
+		dump_stats(i, &tstats[i], prog_start, prog_end, human_dump);
 	}
 	if (human_dump)
 		printf("Program run: %ldms\n", tsc2msec(prog_end - prog_start));
