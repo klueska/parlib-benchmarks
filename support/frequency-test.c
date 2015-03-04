@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,6 +40,7 @@ int main (int argc, char **argv)
 	struct sigaction sa;
 	struct itimerval timer;
 
+	printf("No. of clock ticks per sec from sysconf: %ld\n", sysconf(_SC_CLK_TCK));
 	memset (&sa, 0, sizeof (sa));
 	sa.sa_handler = &event_handler;
 	sigaction (SIGALRM, &sa, NULL);
