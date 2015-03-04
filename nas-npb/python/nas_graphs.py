@@ -161,8 +161,8 @@ def graph_runtime(bdata, config):
     autolabel(axes[i], miny, -0.02, 'top')
 
   axes[-1].yaxis.set_label_position("left")
-  plt.title('Absolute Runtime of NAS Parallel Benchmarks (20 runs)')
-  plt.ylabel('Absolute Runtime (s)')
+  plt.title('Average Runtime of NAS Parallel Benchmarks')
+  plt.ylabel('Average Runtime (s)')
   ax.xaxis.set_major_formatter(ticker.NullFormatter())
   ax.xaxis.set_minor_locator(ticker.FixedLocator(0.5 + np.arange(len(tests))))
   ax.xaxis.set_minor_formatter(ticker.FixedFormatter(tests))
@@ -175,9 +175,9 @@ def graph_runtime(bdata, config):
 
   ps = [p0, p1, p2, p3]
   labels = [
-    "native-pthreads (32 cores)",
+    "Linux-NPTL (32 cores)",
     "upthreads (32 cores)",
-    "native-pthreads (16 cores)",
+    "Linux-NPTL (16 cores)",
     "upthreads (16 cores)",
   ]
   leg = plt.legend(ps, labels, loc="lower center")
@@ -214,8 +214,8 @@ def graph_speedup(bdata, config):
   p1 = ax.bar(margin + ind, speedups1, width, color=colors[1])
   autolabel(ax, p0)
   autolabel(ax, p1)
-  ls = ['Full SMT (32 cores)', 'No SMT (16 cores)']
-  title('Average Speedup of NAS Parallel Benchmarks (20 runs)') 
+  ls = ['Full Hyperthreads (32 cores)', 'No Hyperthreads (16 cores)']
+  title('Average Speedup of NAS Parallel Benchmarks')
   ylabel('Percent Speedup (%)')
   yticks(ax.get_yticks(), map(lambda x: "%s%%" % (x*100), ax.get_yticks()))
   ax.xaxis.set_major_formatter(ticker.NullFormatter())
@@ -242,8 +242,8 @@ def graph_mops(bdata, config):
   fig, ax = plt.subplots()
   p0 = ax.bar(margin + ind, speedups0, width, color=colors[0])
   p1 = ax.bar(margin + ind, speedups1, width, color=colors[1])
-  ls = ['Full SMT (32 cores)', 'No SMT (16 cores)']
-  title('Average Speedup of NAS Parallel Benchmarks (20 runs)') 
+  ls = ['Full Hyperthreads (32 cores)', 'No Hyperthreads (16 cores)']
+  title('Average Speedup of NAS Parallel Benchmarks')
   ylabel('Percent Speedup (%)')
   yticks(ax.get_yticks(), map(lambda x: "%s%%" % (x*100), ax.get_yticks()))
   ax.xaxis.set_major_formatter(ticker.NullFormatter())
@@ -268,8 +268,8 @@ def graph_mopspt(bdata, config):
   fig, ax = plt.subplots()
   p0 = ax.bar(margin + ind, speedups0, width, color=colors[0])
   p1 = ax.bar(margin + ind, speedups1, width, color=colors[1])
-  ls = ['Full SMT (32 cores)', 'No SMT (16 cores)']
-  title('Average Speedup of NAS Parallel Benchmarks (20 runs)') 
+  ls = ['Full Hyperthreads (32 cores)', 'No Hyperthreads (16 cores)']
+  title('Average Speedup of NAS Parallel Benchmarks')
   ylabel('Percent Speedup (%)')
   yticks(ax.get_yticks(), map(lambda x: "%s%%" % (x*100), ax.get_yticks()))
   ax.xaxis.set_major_formatter(ticker.NullFormatter())
