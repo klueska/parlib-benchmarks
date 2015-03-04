@@ -12,6 +12,7 @@ matplotlib.use('Agg')
 from pylab import *
 import numpy as np
 from collections import OrderedDict
+import json
 
 class BenchmarkData:
   def __init__(self, config):
@@ -117,6 +118,46 @@ def graph_completion_times(bdata, config):
   savefig(figname, bbox_inches="tight")
   clf()
 
+def graph_completion_times_inverse(bdata, config):
+  t = "Thread Completion Times For Different Scheduling Algorithms"
+    #+ "%d Threads Running %d Million Iterations Each\n" \
+    #+ "(Average Over %d Runs)"
+  title(t )#% (bdata.num_threads,
+           #  bdata.num_loops * bdata.fake_work / 1000000,
+           #  len(bdata.data.itervalues().next())))
+
+  y_max = 0
+  xlabel("Time (s)")
+  ylabel("Total Threads Completed")
+  for lib in reversed(config.libs.keys()):
+    if 'alias' in config.libs[lib].keys():
+      libname = config.libs[lib]['alias']
+    else:
+      libname = lib
+    ticks = []
+    for i in bdata.data[lib].keys():
+      prog_start = bdata.data[lib][i].prog_start
+      tsc_freq = bdata.data[lib][i].tsc_freq
+      t = map(lambda x: x.end_time - prog_start, bdata.data[lib][i].tstats)
+      ticks.append(sorted(t))
+    avg_ticks = map(lambda x: np.mean(x), np.transpose(ticks))
+    avg_time = map(lambda x: x/tsc_freq, avg_ticks)
+    #print json.dumps(avg_time, indent=4)
+    plot(avg_time, range(len(avg_time)), label=libname, linewidth=3,
+         color=config.libs[lib]['color'])
+    leg = legend(framealpha=0.5, prop={'size': 12},
+                 loc=config.graphs['completion_times']['legend_loc'],
+                 bbox_to_anchor=config.graphs['completion_times']['legend_bbox_to_anchor'])
+    if len(avg_time) > y_max:
+      y_max = len(avg_time)
+  x1,x2,y1,y2 = axis()
+  axis((x1,x2,y1,y_max))
+  for legobj in leg.legendHandles:
+    legobj.set_linewidth(10.0)
+  figname = config.output_folder + "/completion_times_inverse.png"
+  savefig(figname, bbox_inches="tight")
+  clf()
+
 def generate_graphs(parser, args):
   config = lambda:None
   if args.config_file:
@@ -140,4 +181,5 @@ def generate_graphs(parser, args):
   graph_compute_times(bdata, config)
   graph_start_times(bdata, config)
   graph_completion_times(bdata, config)
+  graph_completion_times_inverse(bdata, config)
 
