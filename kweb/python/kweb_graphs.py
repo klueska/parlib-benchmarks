@@ -67,7 +67,10 @@ def graph_linux_throughput(bdata, config):
     for n in data:
       rps_avg[n-1] = np.mean(data[n][-10:])
       rps_std[n-1] = np.var(data[n][-10:])
-    label = "%s%s" % ("" if lib == 'nginx' else 'kweb-', lib)
+    label = lib
+    if label == 'linux-native':
+      label = 'linux-NPTL'
+    label = "%s%s" % ("" if label == 'nginx' else 'kweb-', label)
     plot(ncores, rps_avg, label=label, linewidth=4, color=colors[lib])
 
   title('Average Webserver Throughput')
@@ -103,7 +106,10 @@ def graph_akaros_throughput(bdata, config):
         continue
       rps_avg[__n] = np.mean(data[n][-10:])
       rps_std[__n] = np.var(data[n][-10:])
-    label = "%s%s" % ('kweb-', lib)
+    label = lib
+    if label == 'linux-native':
+      label = 'linux-NPTL'
+    label = "%s%s" % ('kweb-', label)
     plot(ncores, rps_avg, label=label, linewidth=4, color=colors[lib])
 
   title('Average Webserver Throughput')

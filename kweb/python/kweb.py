@@ -30,14 +30,14 @@ arg_params = {
 # Define the commands processed by the command parser #
 #######################################################
 cmd_help_strings = {
-  'nas-graphs' : "Generate all graphs from the INPUT_FILES and place " \
+  'kweb-graphs' : "Generate all graphs from the INPUT_FILES and place " \
                   + "them in OUTPUT_FOLDER. Do this acording to the " \
                   + "configuration options in CONFIG-FILE."
 }
 commands = [
   {
-    'name'        : 'nas-graphs',
-    'description' : cmd_help_strings['nas-graphs'],
+    'name'        : 'kweb-graphs',
+    'description' : cmd_help_strings['kweb-graphs'],
     'arg_params'  : ['config-file'],
     'func'        : 'kweb_graphs',
   },
