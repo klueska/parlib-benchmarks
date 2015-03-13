@@ -143,32 +143,33 @@ def graph_runtime(bdata, config):
   colors = ["#396AB1", "#CC2529", "#3E9651", "#948B3D"]
 
   def autolabel(ax, y, factor, va):
-    p = ax.text(0.5 + ind[i], y*(1 + factor), "%.2fs"%float(y), size="10", ha='center', va=va)
+    p = ax.text(0.5 + ind[i], y*(1 + factor), "%.1fs"%float(y), size="12", ha='center', va=va)
     return p
 
   fig, ax = plt.subplots()
   axes = [ax] + map(lambda x: ax.twinx(), range(len(tests) - 1))
   ax = axes[0]
   for i, t in enumerate(tests):
-    p0 = axes[i].hlines(runtimes0[i][1], margin + ind[i], margin + ind[i] + (1 - 2*margin), linewidth=4, color=colors[0])
-    p1 = axes[i].hlines(runtimes0[i][0], margin + ind[i], margin + ind[i] + (1 - 2*margin), linewidth=4, color=colors[1])
-    p2 = axes[i].hlines(runtimes1[i][1], margin + ind[i], margin + ind[i] + (1 - 2*margin), linewidth=4, color=colors[2])
-    p3 = axes[i].hlines(runtimes1[i][0], margin + ind[i], margin + ind[i] + (1 - 2*margin), linewidth=4, color=colors[3])
+    p0 = axes[i].hlines(runtimes0[i][1], margin + ind[i], margin + ind[i] + (1 - 2*margin), linewidth=8, color=colors[0])
+    p1 = axes[i].hlines(runtimes0[i][0], margin + ind[i], margin + ind[i] + (1 - 2*margin), linewidth=8, color=colors[1])
+    p2 = axes[i].hlines(runtimes1[i][1], margin + ind[i], margin + ind[i] + (1 - 2*margin), linewidth=8, color=colors[2])
+    p3 = axes[i].hlines(runtimes1[i][0], margin + ind[i], margin + ind[i] + (1 - 2*margin), linewidth=8, color=colors[3])
     maxy = max(runtimes0[i][0], runtimes0[i][1], runtimes1[i][0], runtimes1[i][1])
     miny = min(runtimes0[i][0], runtimes0[i][1], runtimes1[i][0], runtimes1[i][1])
     axes[i].set_ylim(0, 1.10*maxy)
-    autolabel(axes[i], maxy, 0.02, 'bottom')
-    autolabel(axes[i], miny, -0.02, 'top')
+    autolabel(axes[i], maxy, 0.03, 'bottom')
+    autolabel(axes[i], miny, -0.03, 'top')
 
   axes[-1].yaxis.set_label_position("left")
-  plt.title('Average Runtime of NAS Parallel Benchmarks')
-  plt.ylabel('Average Runtime (s)')
+  plt.title('Average Runtime of NAS Parallel Benchmarks', fontsize=20)
+  plt.ylabel('Average Runtime (s)', fontsize=18)
   ax.xaxis.set_major_formatter(ticker.NullFormatter())
   ax.xaxis.set_minor_locator(ticker.FixedLocator(0.5 + np.arange(len(tests))))
   ax.xaxis.set_minor_formatter(ticker.FixedFormatter(tests))
   for tick in ax.xaxis.get_minor_ticks():
       tick.tick1line.set_markersize(0)
       tick.tick2line.set_markersize(0)
+      tick.label.set_fontsize(18)
   for axis in axes[1:]:
     axis.get_yaxis().set_ticks([])
   ax.get_yaxis().set_ticklabels([0])
@@ -182,9 +183,7 @@ def graph_runtime(bdata, config):
   ]
   leg = plt.legend(ps, labels, loc="lower center")
   for legobj in leg.legendHandles:
-    legobj.set_linewidth(10.0)
-  legtitle = leg.get_title()
-  legtitle.set_fontsize(14)
+    legobj.set_linewidth(15.0)
   figname = config.output_folder + "/nas-runtimes.png"
   savefig(figname, bbox_inches="tight")
   clf()
@@ -207,7 +206,7 @@ def graph_speedup(bdata, config):
         y = -y
         offset = -offset
         va = 'top'
-      ax.text(x, y+offset, '%.1f%%'%(100*float(y)), size="10", ha='center', va=va)
+      ax.text(x, y+offset, '%.1f%%'%(100*float(y)), size="14", ha='center', va=va)
 
   fig, ax = plt.subplots()
   p0 = ax.bar(margin + ind, speedups0, width, color=colors[0])
@@ -215,18 +214,19 @@ def graph_speedup(bdata, config):
   autolabel(ax, p0)
   autolabel(ax, p1)
   ls = ['Full Hyperthreads (32 cores)', 'No Hyperthreads (16 cores)']
-  title('Average Speedup of NAS Parallel Benchmarks')
-  ylabel('Percent Speedup (%)')
-  yticks(ax.get_yticks(), map(lambda x: "%s%%" % (x*100), ax.get_yticks()))
+  title('Average Speedup of NAS Parallel Benchmarks', fontsize=20)
+  ylabel('Percent Speedup (%)', fontsize=18)
+  yticks(ax.get_yticks(), map(lambda x: "%s%%" % (x*100), ax.get_yticks()), fontsize=18)
   ax.xaxis.set_major_formatter(ticker.NullFormatter())
   ax.xaxis.set_minor_locator(ticker.FixedLocator(0.5 + np.arange(len(tests))))
   ax.xaxis.set_minor_formatter(ticker.FixedFormatter(tests))
   for tick in ax.xaxis.get_minor_ticks():
       tick.tick1line.set_markersize(0)
       tick.tick2line.set_markersize(0)
+      tick.label.set_fontsize(18)
   x1,x2,y1,y2 = ax.axis()
   ax.axis((x1,x2,y1,0.85))
-  ax.legend([p0, p1], ls, loc='best')
+  ax.legend([p0, p1], ls, loc='best', fontsize=18)
   figname = config.output_folder + "/nas-speedup.png"
   savefig(figname, bbox_inches="tight")
   clf()

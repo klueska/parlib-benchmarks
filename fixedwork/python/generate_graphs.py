@@ -142,7 +142,7 @@ def graph_completion_times_inverse(bdata, config):
       ticks.append(sorted(t))
     avg_ticks = map(lambda x: np.mean(x), np.transpose(ticks))
     avg_time = map(lambda x: x/tsc_freq, avg_ticks)
-    #print json.dumps(avg_time, indent=4)
+    print json.dumps(avg_time, indent=4)
     plot(avg_time, range(len(avg_time)), label=libname, linewidth=3,
          color=config.libs[lib]['color'])
     leg = legend(framealpha=0.5, prop={'size': 12},
