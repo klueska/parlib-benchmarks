@@ -1,6 +1,7 @@
 #include <string>
 #include <atomic>
 #include <vector>
+#include <mutex>
 #include <unistd.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -9,6 +10,7 @@
 #include <sys/time.h>
 #include <signal.h>
 #include <sys/socket.h>
+#include <math.h>
 #include <arpa/inet.h>
 
 struct sample {
@@ -26,8 +28,8 @@ static int rate;
 static const char* url;
 static struct sockaddr_in remote;
 static std::atomic<uint64_t> num_tags = ATOMIC_VAR_INIT(0);
-static std::atomic<uint64_t> last_tag = ATOMIC_VAR_INIT(0);
-static double t0, t1;
+static std::vector<double> latencies(0);
+static std::mutex latencies_mutex;
 static uint64_t max_samples;
 
 static double gettime()
@@ -37,14 +39,59 @@ static double gettime()
   return t.tv_sec + 1e-6*t.tv_usec;
 }
 
-static void print_stats()
+static double interval_throughput(uint64_t last_tag, uint64_t curr_tag,
+                               double last_time, double curr_time)
 {
-  double t = gettime();
-  if (t - t1 >= 5) {
-    uint64_t curr_tag = std::atomic_load(&num_tags);
-    fprintf(stderr, "%d requests/sec\n", (int)((curr_tag-last_tag) / (t - t1)));
-    last_tag = curr_tag;
-    t1 = t;
+  return (curr_tag - last_tag) / (double)(curr_time - last_time);
+}
+
+static double interval_avg_latency(uint64_t last_tag, uint64_t curr_tag)
+{
+  double sum = 0;
+  latencies_mutex.lock();
+  for (uint64_t i = last_tag; i < curr_tag; i++) {
+    sum += latencies[i];
+  }
+  latencies_mutex.unlock();
+  return sum / (double)(curr_tag - last_tag);
+}
+
+static double interval_std_latency(uint64_t last_tag, uint64_t curr_tag,
+                                  double avg_lat)
+{
+  double sum = 0;
+  latencies_mutex.lock();
+  for (uint64_t i = last_tag; i < curr_tag; i++) {
+    sum =+ pow(latencies[i] - avg_lat, 2);
+  }
+  latencies_mutex.unlock();
+  return sqrt(sum / (double)(curr_tag - last_tag));
+}
+
+static void *print_stats(void *arg)
+{
+  double start_time, t0, t1;
+  uint64_t tag0, tag1;
+  start_time = t0 = gettime();
+  tag0 = std::atomic_load(&num_tags);
+
+  while (!max_samples || tag0 < max_samples) {
+    sleep(10);
+    t1 = gettime();
+    tag1 = std::atomic_load(&num_tags);
+    double tput = interval_throughput(tag0, tag1, t0, t1);
+    double avg_lat = interval_avg_latency(tag0, tag1);
+    double std_lat = interval_std_latency(tag0, tag1, avg_lat);
+    fprintf(stdout, "%f requests/sec, "
+                    "%f avg latency, "
+                    "%f std latency, "
+                    "%ld total requests, "
+                    "%f interval time, "
+                    "%f total time\n",
+            tput, avg_lat, std_lat, tag1 - tag0, t1 - t0, t1 - start_time);
+    fflush(stdout);
+    tag0 = tag1;
+    t0 = t1;
   }
 }
 
@@ -190,8 +237,13 @@ static void* connection(void* arg)
       samples[ridx].recv_stop = gettime();
       samples[ridx].tag = std::atomic_fetch_add(&num_tags, uint64_t(1));
 
-      if (id == 0)
-        print_stats();
+      latencies_mutex.lock();
+        if (samples[ridx].tag + 1 > latencies.size()) {
+          latencies.resize(2 * (samples[ridx].tag + 1));
+        }
+        latencies[samples[ridx].tag] = samples[ridx].recv_stop
+                                     - samples[ridx].send_start;
+      latencies_mutex.unlock();
 
       if (max_samples && samples[ridx].tag >= max_samples) {
         samples.resize(ridx);
@@ -250,12 +302,15 @@ int main(int argc, char** argv)
   if (argc >= 9)
     max_samples = atoll(argv[8]);
 
-  t0 = t1 = gettime();
+  pthread_t stats_thread;
+  if (pthread_create(&stats_thread, 0, print_stats, 0) < 0) {
+      perror("can't make stats_thread");
+  }
 
   std::vector<pthread_t> threads(nc);
   for (int i = 0; i < nc; i++) {
     if (pthread_create(&threads[i], 0, connection, (void*)(uintptr_t)i) < 0) {
-      perror("can't make threads");
+      perror("can't make connection threads");
       return 1;
     }
   }
