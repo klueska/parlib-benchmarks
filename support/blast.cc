@@ -207,11 +207,13 @@ static void* connection(void* arg)
     int yes = 1;
     if(setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))) {
       perror("could not set sockopts");
+      close(sock);
       continue; exit(1);
     }
 
     if (connect(sock, (struct sockaddr*)&remote, sizeof(struct sockaddr)) < 0) {
       perror("failed to connect");
+      close(sock);
       continue; exit(1);
     }
 
